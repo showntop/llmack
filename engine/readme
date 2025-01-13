@@ -1,0 +1,5 @@
+
+# Engine
+
+The engine is the core of the app. It is responsible for build an AI app, the
+rendering, the input, the sound, the physics, the AI, the networking, etc.

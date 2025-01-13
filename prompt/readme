@@ -1,0 +1,52 @@
+# Prompt Core
+
+A Go implementation of prompt optimization framework inspired by Ape, DSPy and PromptWizard.
+
+## Key Components
+
+1. Prompt Management
+- Structured prompt representation
+- Template system for dynamic prompts
+- Version control for prompts
+
+2. Optimization Pipeline  
+- Mutation strategies
+- Evaluation metrics
+- Feedback loop
+
+3. Training Framework
+- Few-shot learning
+- Example management
+- Performance tracking
+
+4. Integration
+- LLM API connectors 
+- Metrics collection
+- Result analysis
+
+## Basic Usage
+
+
+## Key Features
+
+1. Modular Architecture
+- Easily extensible components
+- Pluggable optimization strategies
+- Custom metric support
+
+2. Built-in Methods
+- Few-shot optimization
+- Prompt mutation
+- Example synthesis
+- Performance evaluation
+
+3. Production Ready
+- Concurrent optimization
+- Result caching
+- Error handling
+- Logging
+
+4. Developer Experience
+- Clear interfaces
+- Comprehensive documentation
+- Example implementations
