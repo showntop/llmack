@@ -89,3 +89,8 @@ func WarnContextf(ctx context.Context, format string, args ...interface{}) {
 func DebugContextf(ctx context.Context, format string, args ...interface{}) {
 	defaultLogger.DebugContextf(ctx, format, args...)
 }
+
+// Info ...
+func Info(format string, args ...interface{}) {
+	defaultLogger.DebugContextf(context.TODO(), format, args...)
+}

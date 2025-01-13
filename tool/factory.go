@@ -22,13 +22,13 @@ func (f *Factory) Instantiate(providerID int64, providerKind string, name string
 	if providerKind == "api" {
 		bundle, err := f.repo.FetchAPITool(context.TODO(), providerID, name)
 		if err != nil {
-			return &NilTool{}
+			return &NilTool{Target: name}
 		}
 		return NewAPITool(*bundle)
 	} else if providerKind == "code" {
 		return NewCodeTool(name)
 	}
-	return &NilTool{}
+	return &NilTool{Target: name}
 }
 
 var defaultFactory = NewFactory(nil)

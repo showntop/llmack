@@ -52,7 +52,7 @@ func (t *CodeTool) Stream(ctx context.Context, args map[string]any) (<-chan any,
 func NewCodeTool(name string) Tool {
 	x, ok := CodeTools[name]
 	if !ok {
-		return &NilTool{}
+		return &NilTool{Target: name}
 	}
 	return x
 }

@@ -17,7 +17,8 @@ type Tool interface {
 
 // NilTool 无工具
 type NilTool struct {
-	ID int64
+	Target string
+	ID     int64
 }
 
 // Kind 工具类型
@@ -42,10 +43,10 @@ func (t *NilTool) Parameters() map[string]any {
 
 // Invoke 调用工具
 func (t *NilTool) Invoke(ctx context.Context, params map[string]any) (string, error) {
-	return "", fmt.Errorf("tool not found")
+	return "", fmt.Errorf("%s tool not found", t.Target)
 }
 
 // Stream 流式调用工具
 func (t *NilTool) Stream(ctx context.Context, params map[string]any) (<-chan any, error) {
-	return nil, fmt.Errorf("tool not found")
+	return nil, fmt.Errorf("%s tool not found", t.Target)
 }
