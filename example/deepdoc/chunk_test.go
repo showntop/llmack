@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/showntop/llmack/rag/deepdoc/chunk"
 
@@ -60,7 +61,7 @@ From 2012, a group of people, including Jeff Atwood and John MacFarlane, launche
 
 Implementations of Markdown are available for over a dozen programming languages.`
 
-func main() {
+func Test_Chunk(t *testing.T) {
 
 	htso := [][2]string{
 		[2]string{"#", "Header 1"},
