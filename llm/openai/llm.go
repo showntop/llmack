@@ -26,8 +26,7 @@ type LLM struct {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.PromptMessageTool,
-	options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
 	}
@@ -52,13 +51,13 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.Pr
 	}
 
 	var toolsOpenAI []openai.ChatCompletionToolParam
-	for _, t := range tools {
+	for _, t := range opts.Tools {
 		toolsOpenAI = append(toolsOpenAI, openai.ChatCompletionToolParam{
 			Type: openai.F(openai.ChatCompletionToolTypeFunction),
 			Function: openai.F(openai.FunctionDefinitionParam{
-				Name:        openai.F(t.Name),
-				Description: openai.F(t.Description),
-				Parameters:  openai.F(openai.FunctionParameters(t.Parameters)),
+				Name:        openai.F(t.Function.Name),
+				Description: openai.F(t.Function.Description),
+				Parameters:  openai.F(openai.FunctionParameters(t.Function.Parameters)),
 			}),
 		})
 	}

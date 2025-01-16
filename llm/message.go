@@ -132,13 +132,6 @@ type ToolCallFunction struct {
 	Arguments string `json:"args"`
 }
 
-// PromptMessageTool for prompt message tool
-type PromptMessageTool struct {
-	Name        string
-	Description string
-	Parameters  map[string]any
-}
-
 // Messages ...
 type Messages[T PromptMessage | assistantPromptMessage] []T
 

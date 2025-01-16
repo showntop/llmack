@@ -180,7 +180,7 @@ func (p *predictor) Result(ctx context.Context, value any) error {
 	if err != nil {
 		return err
 	}
-	response, err := p.model.Invoke(ctx, messages, nil,
+	response, err := p.model.Invoke(ctx, messages,
 		llm.WithStream(true),
 	)
 	if err != nil {

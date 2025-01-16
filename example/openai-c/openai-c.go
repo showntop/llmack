@@ -35,7 +35,6 @@ func runWithCache() {
 
 	resp, err := instance.Invoke(ctx,
 		[]llm.Message{llm.UserPromptMessage("你好")},
-		[]llm.PromptMessageTool{},
 		llm.WithModel("hunyuan"),
 		llm.WithStream(true),
 	)
@@ -46,7 +45,6 @@ func runWithCache() {
 
 	resp, err = instance.Invoke(ctx,
 		[]llm.Message{llm.UserPromptMessage("你好")},
-		[]llm.PromptMessageTool{},
 		llm.WithModel("hunyuan"),
 		llm.WithStream(true),
 	)

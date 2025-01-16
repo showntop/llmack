@@ -28,8 +28,7 @@ type LLM struct {
 }
 
 // Invoke TODO
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.PromptMessageTool,
-	options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
 	}
@@ -58,13 +57,13 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.Pr
 	}
 
 	// @TODO tools support
-	toolsOpenAI := make([]azopenai.ChatCompletionsToolDefinitionClassification, 0, len(tools))
-	for _, t := range tools {
-		raw, _ := json.Marshal(t.Parameters)
+	toolsOpenAI := make([]azopenai.ChatCompletionsToolDefinitionClassification, 0, len(opts.Tools))
+	for _, t := range opts.Tools {
+		raw, _ := json.Marshal(t.Function.Parameters)
 		toolsOpenAI = append(toolsOpenAI, &azopenai.ChatCompletionsFunctionToolDefinition{
 			Function: &azopenai.ChatCompletionsFunctionToolDefinitionFunction{
-				Name:        &t.Name,
-				Description: &t.Description,
+				Name:        &t.Function.Name,
+				Description: &t.Function.Description,
 				Parameters:  raw,
 			},
 		})
