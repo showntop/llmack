@@ -104,12 +104,12 @@ func (engine *AgentEngine) Stream(ctx context.Context, input Input) *EventStream
 
 func (engine *AgentEngine) iterate(ctx context.Context,
 	inputs map[string]any, query string, contexts string,
-	messageTools []llm.PromptMessageTool, result *EventStream) (string, bool, error) {
+	tools []llm.Tool, result *EventStream) (string, bool, error) {
 	messages, _ := engine.RenderPromptMessages(ctx, engine.Settings.PresetPrompt, inputs, query, contexts)
 
 	instance := llm.NewInstance(engine.Settings.LLMModel.Provider)
 	reponse, err := instance.Invoke(ctx, messages,
-		messageTools,
+		llm.WithTools(tools...),
 		llm.WithModel(engine.Settings.LLMModel.Name),
 	)
 	if err != nil {
@@ -174,7 +174,7 @@ func (engine *AgentEngine) Invoke(ctx context.Context, input Input) (any, error)
 		instance := llm.NewInstance(settings.LLMModel.Provider)
 		response, err := instance.Invoke(ctx,
 			messages,
-			messageTools,
+			llm.WithTools(messageTools...),
 			llm.WithModel(settings.LLMModel.Name),
 		)
 		if err != nil {

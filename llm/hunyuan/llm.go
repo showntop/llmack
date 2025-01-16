@@ -25,8 +25,7 @@ type LLM struct {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.PromptMessageTool,
-	options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
 	}
@@ -45,19 +44,19 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.Pr
 		})
 	}
 	// tools
-	if len(tools) > 0 {
+	if len(opts.Tools) > 0 {
 		fuction := "function"
 		auto := "auto"
 		request.ToolChoice = &auto
-		request.Tools = make([]*hunyuan.Tool, len(tools))
-		for i, t := range tools {
-			raw, _ := json.Marshal(t.Parameters)
+		request.Tools = make([]*hunyuan.Tool, len(opts.Tools))
+		for i, t := range opts.Tools {
+			raw, _ := json.Marshal(t.Function.Parameters)
 			params := string(raw)
 			request.Tools[i] = &hunyuan.Tool{
 				Type: &fuction,
 				Function: &hunyuan.ToolFunction{
-					Name:        &t.Name,
-					Description: &t.Description,
+					Name:        &t.Function.Name,
+					Description: &t.Function.Description,
 					Parameters:  &params,
 				},
 			}

@@ -14,7 +14,7 @@ type logger interface {
 
 // Provider ...
 type Provider interface {
-	Invoke(context.Context, []Message, []PromptMessageTool, ...InvokeOption) (*Response, error)
+	Invoke(context.Context, []Message, ...InvokeOption) (*Response, error)
 }
 
 // Instance ...
@@ -88,7 +88,7 @@ func NewInstance(provider string, opts ...Option) *Instance {
 
 // Invoke ...
 func (mi *Instance) Invoke(ctx context.Context,
-	messages []Message, tools []PromptMessageTool, options ...InvokeOption) (*Response, error) {
+	messages []Message, options ...InvokeOption) (*Response, error) {
 
 	if mi.provider == nil {
 		return nil, fmt.Errorf("llm provider of %v is not registered", mi.name)
@@ -99,7 +99,15 @@ func (mi *Instance) Invoke(ctx context.Context,
 		}
 	}
 
-	response, err := mi.invoke(ctx, messages, tools, options...)
+	// 删除 options 中 nil
+	for i := 0; i < len(options); i++ {
+		if options[i] == nil {
+			options = append(options[:i], options[i+1:]...)
+			i--
+		}
+	}
+
+	response, err := mi.invoke(ctx, messages, options...)
 
 	if mi.opts != nil && mi.opts.hooks != nil {
 		for _, hook := range mi.opts.hooks {
@@ -110,11 +118,19 @@ func (mi *Instance) Invoke(ctx context.Context,
 }
 
 func (mi *Instance) invoke(ctx context.Context,
-	messages []Message, tools []PromptMessageTool, options ...InvokeOption) (*Response, error) {
+	messages []Message, options ...InvokeOption) (*Response, error) {
 
 	updateCache := func(ctx context.Context, result string) {} // nothing todo
 
-	if mi.opts.cache != nil && len(tools) <= 0 { // fetch from cache
+	var invokeOpts InvokeOptions
+	for i := 0; i < len(options); i++ {
+		if options[i] == nil {
+			continue
+		}
+		options[i](&invokeOpts)
+	}
+
+	if mi.opts.cache != nil && len(invokeOpts.Tools) <= 0 { // fetch from cache
 		document, hited, err := mi.opts.cache.Fetch(ctx, messages)
 		if err != nil {
 			return nil, err
@@ -125,7 +141,7 @@ func (mi *Instance) invoke(ctx context.Context,
 		}
 
 		updateCache = func(ctx context.Context, result string) {
-			if mi.opts.cache != nil && len(tools) <= 0 { // store cache
+			if mi.opts.cache != nil && len(invokeOpts.Tools) <= 0 { // store cache
 				mi.opts.logger.InfoContextf(ctx, "llm cache update cache value %v", result)
 				if err := mi.opts.cache.Store(ctx, document, result); err != nil {
 					return
@@ -135,16 +151,11 @@ func (mi *Instance) invoke(ctx context.Context,
 
 	}
 
-	var invokeOpts InvokeOptions
-	for i := 0; i < len(options); i++ {
-		options[i](&invokeOpts)
-	}
-
 	if invokeOpts.Model == "" {
 		options = append(options, WithModel(mi.opts.model))
 	}
 
-	response, err := mi.provider.Invoke(ctx, messages, tools, options...)
+	response, err := mi.provider.Invoke(ctx, messages, options...)
 	if err != nil {
 		return response, err
 	}

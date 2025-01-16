@@ -145,24 +145,31 @@ func (r *BotEngine) RenderMessages(ctx context.Context, preset string,
 }
 
 // RenderTools ...
-func (r *BotEngine) RenderTools(tools []ToolSetting) []llm.PromptMessageTool {
-	messageTools := make([]llm.PromptMessageTool, 0)
+func (r *BotEngine) RenderTools(tools []ToolSetting) []llm.Tool {
+	messageTools := make([]llm.Tool, 0)
 	for _, tool := range tools {
-		messageTool := llm.PromptMessageTool{Name: tool.Name, Description: tool.Description, Parameters: map[string]any{
-			"type":       "object",
-			"properties": map[string]any{},
-			"required":   []string{},
-		}}
+		messageTool := llm.Tool{
+			Type: "function",
+			Function: &llm.FunctionDefinition{
+				Name:        tool.Name,
+				Description: tool.Description,
+				Parameters: map[string]any{
+					"type":       "object",
+					"properties": map[string]any{},
+					"required":   []string{},
+				},
+			},
+		}
 
 		for _, p := range tool.Parameters {
-			properties := messageTool.Parameters["properties"].(map[string]any)
+			properties := messageTool.Function.Parameters["properties"].(map[string]any)
 			properties[p.Name] = map[string]any{
 				"description": p.LLMDescrition,
 				"type":        p.Type,
 				"enum":        nil,
 			}
 			if p.Required {
-				messageTool.Parameters["required"] = append(messageTool.Parameters["required"].([]string), p.Name)
+				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
 			}
 		}
 

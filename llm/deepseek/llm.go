@@ -37,8 +37,7 @@ func (m *LLM) Name() string {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.PromptMessageTool,
-	optFuncs ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, optFuncs ...llm.InvokeOption) (*llm.Response, error) {
 
 	options := &llm.InvokeOptions{}
 	for i := 0; i < len(optFuncs); i++ {
@@ -50,7 +49,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.Pr
 	}
 
 	// chat completions
-	body, err := m.ChatCompletions(ctx, m.buildRequest(messages, tools, options))
+	body, err := m.ChatCompletions(ctx, m.buildRequest(messages, options))
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +93,7 @@ func (m *LLM) ChatCompletions(ctx context.Context, req *ChatCompletionsRequest) 
 }
 
 // buildRequest ...
-func (m *LLM) buildRequest(messages []llm.Message, tools []llm.PromptMessageTool, options *llm.InvokeOptions) *ChatCompletionsRequest {
+func (m *LLM) buildRequest(messages []llm.Message, options *llm.InvokeOptions) *ChatCompletionsRequest {
 	request := &ChatCompletionsRequest{}
 	request.Model = options.Model
 	if options.TopP > 0 {
@@ -113,19 +112,19 @@ func (m *LLM) buildRequest(messages []llm.Message, tools []llm.PromptMessageTool
 		})
 	}
 	// tools
-	if len(tools) <= 0 {
+	if len(options.Tools) <= 0 {
 		return request
 	}
 	request.ToolChoice = "auto"
-	request.Tools = make([]*Tool, len(tools))
-	for i, t := range tools {
-		raw, _ := json.Marshal(t.Parameters)
+	request.Tools = make([]*Tool, len(options.Tools))
+	for i, t := range options.Tools {
+		raw, _ := json.Marshal(t.Function.Parameters)
 		params := string(raw)
 		request.Tools[i] = &Tool{
 			Type: "function",
 			Function: &ToolFunction{
-				Name:        t.Name,
-				Description: t.Description,
+				Name:        t.Function.Name,
+				Description: t.Function.Description,
 				Parameters:  params,
 			},
 		}

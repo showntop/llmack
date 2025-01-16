@@ -26,8 +26,7 @@ type LLM struct {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.PromptMessageTool,
-	options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
 	}
@@ -52,15 +51,15 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.Pr
 	}
 
 	// tools
-	if len(tools) > 0 {
-		req.Tools = make([]*moonshot.ChatCompletionsTool, len(tools))
-		for i, t := range tools {
+	if len(opts.Tools) > 0 {
+		req.Tools = make([]*moonshot.ChatCompletionsTool, len(opts.Tools))
+		for i, t := range opts.Tools {
 			req.Tools[i] = &moonshot.ChatCompletionsTool{
 				Type: "function",
 				Function: &moonshot.ChatCompletionsToolFunction{
-					Name:        t.Name,
-					Description: t.Description,
-					// Parameters:  t.Parameters,
+					Name:        t.Function.Name,
+					Description: t.Function.Description,
+					// Parameters:  t.Function.Parameters,
 				},
 			}
 		}

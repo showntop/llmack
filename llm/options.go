@@ -75,7 +75,7 @@ type FunctionDefinition struct {
 	// Description is a description of the function.
 	Description string `json:"description"`
 	// Parameters is a list of parameters for the function.
-	Parameters any `json:"parameters,omitempty"`
+	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
 // ToolChoice is a specific tool to use.
@@ -109,6 +109,13 @@ type InvokeOption func(*InvokeOptions)
 func WithModel(model string) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.Model = model
+	}
+}
+
+// WithTools specifies which tools to use.
+func WithTools(tools ...Tool) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.Tools = tools
 	}
 }
 

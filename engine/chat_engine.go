@@ -32,7 +32,7 @@ func (r *ChatEngine) Stream(ctx context.Context, input Input) *EventStream {
 
 	// Invoke model
 	instance := llm.NewInstance(settings.LLMModel.Provider)
-	response, err := instance.Invoke(ctx, messages, nil,
+	response, err := instance.Invoke(ctx, messages,
 		llm.WithModel(settings.LLMModel.Name),
 		llm.WithStream(true),
 	)

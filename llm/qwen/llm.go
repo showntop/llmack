@@ -1,31 +1,32 @@
-package openai
+package qwen
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/showntop/llmack/llm"
-	"github.com/showntop/llmack/log"
 )
 
 const (
 	// Name name of llm
-	Name = "openai"
+	Name = "qwen"
 )
 
 func init() {
 	llm.Register(Name, &LLM{})
 }
 
-// LLM ...
+// LLM TODO
 type LLM struct {
 	client *openai.Client
 }
 
-// Invoke ...
+var initOnce sync.Once
+
+// Invoke TODO
 func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
@@ -65,19 +66,17 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 	params := openai.ChatCompletionNewParams{
 		Messages: openai.F(messagesOpenAI),
 		Tools:    openai.F(toolsOpenAI),
-		// Seed:     openai.Int(0),
-		Model: openai.F(opts.Model),
+		Model:    openai.F(opts.Model),
 	}
-	raw, _ := json.Marshal(params)
-	log.InfoContextf(ctx, "openai params: %s", string(raw))
+
 	stream := m.client.Chat.Completions.NewStreaming(ctx, params)
 
-	// 流式响应
 	acc := openai.ChatCompletionAccumulator{}
 
 	response := llm.NewStreamResponse()
 	go func() {
 		defer response.Stream().Close()
+
 		for stream.Next() {
 			chunk := stream.Current()
 			mmm := llm.AssistantPromptMessage(chunk.Choices[0].Delta.Content)
@@ -88,7 +87,6 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 			}
 
 			if tool, ok := acc.JustFinishedToolCall(); ok {
-				// println("Tool call stream finished:", tool.Index, tool.Name, tool.Arguments)
 				call := acc.Choices[0].Message.ToolCalls[tool.Index]
 				mmm.ToolCalls = append(mmm.ToolCalls, &llm.ToolCall{
 					ID:   call.ID,
@@ -108,11 +106,11 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 			// if len(chunk.Choices) > 0 {
 			// 	println(chunk.Choices[0].Delta.JSON.RawJSON())
 			// }
-			response.Stream().Push(llm.NewChunk(0, mmm, nil))
 
+			response.Stream().Push(llm.NewChunk(0, mmm, nil))
 		}
-		if stream.Err() != nil {
-			panic(stream.Err())
+		if err := stream.Err(); err != nil {
+			panic(err)
 		}
 	}()
 
@@ -120,14 +118,19 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 }
 
 func (m *LLM) setupClient() error {
-	config, _ := llm.Config.Get("openai").(map[string]any)
-	if config == nil {
-		return fmt.Errorf("openai config not found")
-	}
-	apiKey, _ := config["api_key"].(string)
-	client := openai.NewClient(
-		option.WithAPIKey(apiKey),
-	)
-	m.client = client
-	return nil
+	var err error
+	initOnce.Do(func() {
+		config, _ := llm.Config.Get(Name).(map[string]any)
+		if config == nil {
+			err = fmt.Errorf("%s config not found", Name)
+		}
+		apiKey, _ := config["api_key"].(string)
+		client := openai.NewClient(
+			option.WithAPIKey(apiKey),
+			option.WithBaseURL("https://dashscope.aliyuncs.com/compatible-mode/v1/"),
+		)
+		m.client = client
+	})
+
+	return err
 }

@@ -24,8 +24,7 @@ type LLM struct {
 }
 
 // Invoke TODO
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.PromptMessageTool,
-	options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
 	response := llm.NewStreamResponse()
 
 	if err := m.setupClient(); err != nil { // TODO sync.Once
@@ -46,11 +45,11 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, tools []llm.Pr
 	}
 
 	var internalTools []zhipu.ChatCompletionTool
-	for _, t := range tools {
+	for _, t := range opts.Tools {
 		internalTools = append(internalTools, zhipu.ChatCompletionToolFunction{
-			Name:        t.Name,
-			Description: t.Description,
-			Parameters:  openai.FunctionParameters(t.Parameters),
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			Parameters:  openai.FunctionParameters(t.Function.Parameters),
 		})
 	}
 	service := m.client.
