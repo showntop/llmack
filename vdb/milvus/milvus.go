@@ -63,17 +63,19 @@ func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	if err != nil {
 		return nil, fmt.Errorf("create search param: %w", err)
 	}
-
+	sp.AddRadius(options.Threshold)
 	searchResult, err := m.client.Search(
 		ctx,
 		m.collection,
-		[]string{},              // partition names
-		"vector_field",          // vector field name
-		[]entity.Vector(vector), // search vectors
-		"id",                    // output fields
-		entity.L2,               // metric type
-		options.Topk,            // topK
-		sp,                      // search param
+		[]string{},               // partition names
+		"",                       // expr,Filter expressions
+		[]string{"vector_field"}, // List ofx field names to include in the return.
+		//[]entity.Vector{entity.FloatVector(vector)}, // search vectors
+		[]entity.Vector{}, // search vectors
+		"id",              // vector fields
+		entity.L2,         // metric type
+		options.Topk,      // topK
+		sp,                // search param
 	)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
@@ -82,14 +84,11 @@ func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	// 转换结果
 	var docs []vdb.Document
 	for i := 0; i < len(searchResult); i++ {
-		score := searchResult[i].Scores
-		if score > options.Threshold {
-			docs = append(docs, vdb.Document{
-				ID:     searchResult[i].ID,
-				Score:  score,
-				Vector: vector,
-			})
-		}
+		docs = append(docs, vdb.Document{
+			ID:     searchResult[i].IDs.Name(),
+			Scores: searchResult[i].Scores,
+			//Vector: vector,
+		})
 	}
 
 	return docs, nil
@@ -137,22 +136,9 @@ func (m *VDB) ensureCollection() error {
 	}
 
 	if !has {
-		schema := &entity.Schema{
-			CollectionName: m.collection,
-			Fields: []*entity.Field{
-				{
-					Name:       "id",
-					DataType:   entity.FieldTypeInt64,
-					PrimaryKey: true,
-					AutoID:     true,
-				},
-				{
-					Name:     "vector_field",
-					DataType: entity.FieldTypeFloatVector,
-					// Dimension: m.dimension,
-				},
-			},
-		}
+		schema := entity.NewSchema().WithName(m.collection).WithDescription("this is the basic example collection").
+			WithField(entity.NewField().WithName("idCol").WithDataType(entity.FieldTypeInt64).WithIsPrimaryKey(true).WithIsAutoID(false)).
+			WithField(entity.NewField().WithName("embeddingCol").WithDataType(entity.FieldTypeFloatVector).WithDim(int64(m.dimension)))
 
 		err = m.client.CreateCollection(ctx, schema, 1)
 		if err != nil {
