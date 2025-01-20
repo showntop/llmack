@@ -17,10 +17,20 @@ type VDB struct {
 	dimension  int
 }
 
+type FieldConfig struct {
+	Name      string
+	Type      entity.FieldType
+	IsPrimary bool
+	IsAuto    bool
+}
+
 type Config struct {
-	Address    string
-	Collection string
-	Dimension  int
+	Address     string
+	Collection  string
+	Description string
+	Dimension   int
+	ShareNum    int
+	Fields      []FieldConfig
 }
 
 // New 创建新的Milvus向量存储实例
@@ -35,12 +45,6 @@ func New(cfg Config) (*VDB, error) {
 		collection: cfg.Collection,
 		dimension:  cfg.Dimension,
 	}
-
-	// 确保集合存在
-	if err := db.ensureCollection(); err != nil {
-		return nil, err
-	}
-
 	return db, nil
 }
 
@@ -127,25 +131,23 @@ func (m *VDB) Close() error {
 }
 
 // 私有辅助方法
-func (m *VDB) ensureCollection() error {
-	ctx := context.Background()
-
-	has, err := m.client.HasCollection(ctx, m.collection)
+func (m *VDB) EnsureCollection(ctx context.Context, cfg Config) error {
+	has, err := m.client.HasCollection(ctx, cfg.Collection)
 	if err != nil {
 		return fmt.Errorf("check collection: %w", err)
 	}
-
-	if !has {
-		schema := entity.NewSchema().WithName(m.collection).WithDescription("this is the basic example collection").
-			WithField(entity.NewField().WithName("idCol").WithDataType(entity.FieldTypeInt64).WithIsPrimaryKey(true).WithIsAutoID(false)).
-			WithField(entity.NewField().WithName("embeddingCol").WithDataType(entity.FieldTypeFloatVector).WithDim(int64(m.dimension)))
-
-		err = m.client.CreateCollection(ctx, schema, 1)
-		if err != nil {
-			return fmt.Errorf("create collection: %w", err)
-		}
+	if has {
+		return nil
+	}
+	schema := entity.NewSchema().WithName(cfg.Collection).WithDescription(cfg.Description)
+	for _, f := range cfg.Fields {
+		schema = schema.WithField(entity.NewField().WithName(f.Name).WithDataType(f.Type).WithIsPrimaryKey(f.IsPrimary).WithIsAutoID(f.IsAuto).WithDim(int64(m.dimension)))
 	}
 
+	err = m.client.CreateCollection(ctx, schema, int32(cfg.ShareNum))
+	if err != nil {
+		return fmt.Errorf("create collection: %w", err)
+	}
 	return nil
 }
 
