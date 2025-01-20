@@ -23,13 +23,13 @@ func main() {
 	content, _ := io.ReadAll(file)
 	sections, err := extractor.Extract(
 		&extractor.Meta{Filename: "企业级 SaaS 行业增长白皮书.pdf"}, content, "doc")
+	if err != nil {
+		panic(err)
+	}
 
 	chunker := chunk.NewCharacterChunker(500, 50, "")
 	chunks, _ := chunker.Chunk(string(strings.Join(sections, "\n")))
-	// chunks := chunk.Chunk(string(strings.Join(sections, "\n")), 2000)
-	// chunks := chunk.Chunk(string(strings.Join(sections, "\n")), 2000)
 	fmt.Println(len(chunks))
-	// fmt.Println(err)
 	for i := 0; i < len(chunks); i++ {
 		fmt.Println("--------------------")
 		fmt.Printf(pstrings.TrimSpecial(chunks[i]))

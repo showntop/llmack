@@ -20,14 +20,17 @@ func New(dimension int) (*FaissDB, error) {
 
 func (f *FaissDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOption) ([]vdb.Document, error) {
 	// 实现向量搜索
+	return nil, nil
 }
 
 func (f *FaissDB) SearchQuery(ctx context.Context, query string, opts ...vdb.SearchOption) ([]vdb.Document, error) {
 	// 实现查询搜索
+	return nil, nil
 }
 
 func (f *FaissDB) Delete(ctx context.Context, id string) error {
 	// 实现删除操作
+	return nil
 }
 
 func (f *FaissDB) Close() error {
