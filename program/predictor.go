@@ -12,7 +12,7 @@ import (
 // predictor ...
 type predictor struct {
 	model   *llm.Instance
-	adapter OutAdapter
+	adapter Adapter
 	inputs  map[string]any
 
 	Promptx
@@ -94,7 +94,7 @@ func (p *predictor) WithInstruction(i string) *predictor {
 }
 
 // WithAdapter ...
-func (p *predictor) WithAdapter(adapter OutAdapter) *predictor {
+func (p *predictor) WithAdapter(adapter Adapter) *predictor {
 	p.adapter = adapter
 	return p
 }

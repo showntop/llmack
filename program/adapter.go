@@ -10,8 +10,8 @@ import (
 	"github.com/showntop/llmack/llm"
 )
 
-// OutAdapter ...
-type OutAdapter interface {
+// Adapter ...
+type Adapter interface {
 	Format(p *predictor, inputs map[string]any, target any) ([]llm.Message, error)
 	Parse(string, any) error
 }
