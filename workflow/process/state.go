@@ -20,18 +20,6 @@ type (
 		// next elements
 		Nexts []wf.Node
 
-		// element error (if any)
-		// Err error
-
-		// input variables that were sent to resume the session
-		Input *wf.Vars
-
-		// scope
-		Scope *wf.Vars
-
-		// element execution results
-		Outputs *wf.Vars
-
 		Action string
 	}
 )

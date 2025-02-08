@@ -145,10 +145,10 @@ func (r *BotEngine) RenderMessages(ctx context.Context, preset string,
 }
 
 // RenderTools ...
-func (r *BotEngine) RenderTools(tools []ToolSetting) []llm.Tool {
-	messageTools := make([]llm.Tool, 0)
+func (r *BotEngine) RenderTools(tools []ToolSetting) []*llm.Tool {
+	messageTools := make([]*llm.Tool, 0)
 	for _, tool := range tools {
-		messageTool := llm.Tool{
+		messageTool := &llm.Tool{
 			Type: "function",
 			Function: &llm.FunctionDefinition{
 				Name:        tool.Name,

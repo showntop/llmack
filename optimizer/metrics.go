@@ -227,7 +227,7 @@ func f1Score(prediction, groundTruth string) float64 {
 	numSame := len(common)
 
 	if len(predictionTokens) == 0 && len(groundTruthTokens) == 0 {
-		fmt.Println("\n#> F1 Metric: Rare edge case of len(predictionTokens) == len(groundTruthTokens) == 0.\n")
+		fmt.Println("\n#> F1 Metric: Rare edge case of len(predictionTokens) == len(groundTruthTokens) == 0.")
 	}
 
 	if numSame == 0 {
@@ -275,7 +275,7 @@ func precisionScore(prediction, groundTruth string) float64 {
 	numSame := len(common)
 
 	if len(predictionTokens) == 0 && len(groundTruthTokens) == 0 {
-		fmt.Println("\n#> F1 Metric: Rare edge case of len(predictionTokens) == len(groundTruthTokens) == 0.\n")
+		fmt.Println("\n#> F1 Metric: Rare edge case of len(predictionTokens) == len(groundTruthTokens) == 0.")
 	}
 
 	if numSame == 0 {

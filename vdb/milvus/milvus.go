@@ -88,11 +88,15 @@ func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	// 转换结果
 	var docs []vdb.Document
 	for i := 0; i < len(searchResult); i++ {
-		docs = append(docs, vdb.Document{
-			ID:     searchResult[i].IDs.Name(),
-			Scores: searchResult[i].Scores,
-			//Vector: vector,
-		})
+		score := searchResult[i].Scores
+		_ = score
+		// if score > options.Threshold {
+		// 	docs = append(docs, vdb.Document{
+		// 		ID:     searchResult[i].ID,
+		// 		Score:  score,
+		// 		Vector: vector,
+		// 	})
+		// }
 	}
 
 	return docs, nil

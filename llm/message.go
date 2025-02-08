@@ -38,6 +38,9 @@ func (m *PromptMessage) UnmarshalJSON(data []byte) error {
 }
 
 func (m PromptMessage) String() string {
+	if m.content == nil {
+		return fmt.Sprintf("%s: %s", m.role, "")
+	}
 	return fmt.Sprintf("%s: %s", m.role, m.content.Data)
 }
 
@@ -80,8 +83,20 @@ func AssistantPromptMessage(text string) *assistantPromptMessage {
 	return m
 }
 
+// AssistantReasoningMessage ...
+func AssistantReasoningMessage(text string) *assistantPromptMessage {
+	m := &assistantPromptMessage{ReasoningContent: text}
+	m.role = PromptMessageRoleAssistant
+	return m
+}
+
 func (m *assistantPromptMessage) WithToolCalls(toolCalls []*ToolCall) *assistantPromptMessage {
 	m.ToolCalls = toolCalls
+	return m
+}
+
+func (m *assistantPromptMessage) WithReasoningContent(content string) *assistantPromptMessage {
+	m.ReasoningContent = content
 	return m
 }
 
@@ -105,7 +120,18 @@ func TextPromptMessageContent(text string) *PromptMessageContent {
 // assistantPromptMessage ...
 type assistantPromptMessage struct {
 	PromptMessage
-	ToolCalls []*ToolCall `json:"tool_calls"`
+	ToolCalls        []*ToolCall `json:"tool_calls"`
+	ReasoningContent string      `json:"reasoning_content"`
+}
+
+func (m *assistantPromptMessage) String() string {
+	if m.ReasoningContent != "" {
+		return fmt.Sprintf("%s: reasoning: %s", m.role, m.ReasoningContent)
+	}
+	if m.content == nil {
+		return fmt.Sprintf("%s: %s", m.role, "")
+	}
+	return fmt.Sprintf("%s: %s", m.role, m.content.Data)
 }
 
 // toolPromptMessage ...
