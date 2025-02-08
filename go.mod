@@ -15,7 +15,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jeremywohl/flatten v1.0.1
 	github.com/joho/godotenv v1.5.1
-	github.com/milvus-io/milvus-sdk-go/v2 v2.4.2
+	github.com/milvus-io/milvus-sdk-go/v2 v2.4.0
 	github.com/northes/go-moonshot v0.5.2
 	github.com/ollama/ollama v0.5.5
 	github.com/openai/openai-go v0.1.0-alpha.45

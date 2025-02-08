@@ -17,10 +17,20 @@ type VDB struct {
 	dimension  int
 }
 
+type FieldConfig struct {
+	Name      string
+	Type      entity.FieldType
+	IsPrimary bool
+	IsAuto    bool
+}
+
 type Config struct {
-	Address    string
-	Collection string
-	Dimension  int
+	Address     string
+	Collection  string
+	Description string
+	Dimension   int
+	ShareNum    int
+	Fields      []FieldConfig
 }
 
 // New 创建新的Milvus向量存储实例
@@ -35,12 +45,6 @@ func New(cfg Config) (*VDB, error) {
 		collection: cfg.Collection,
 		dimension:  cfg.Dimension,
 	}
-
-	// 确保集合存在
-	if err := db.ensureCollection(); err != nil {
-		return nil, err
-	}
-
 	return db, nil
 }
 
@@ -63,19 +67,19 @@ func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	if err != nil {
 		return nil, fmt.Errorf("create search param: %w", err)
 	}
-
+	sp.AddRadius(options.Threshold)
 	searchResult, err := m.client.Search(
 		ctx,
 		m.collection,
-		[]string{},     // partition names
-		"vector_field", // vector field name
-		// []entity.Vector(vector), // search vectors
-		nil,
-		nil,
-		"id",         // output fields
-		entity.L2,    // metric type
-		options.Topk, // topK
-		sp,           // search param
+		[]string{},               // partition names
+		"",                       // expr,Filter expressions
+		[]string{"vector_field"}, // List ofx field names to include in the return.
+		//[]entity.Vector{entity.FloatVector(vector)}, // search vectors
+		[]entity.Vector{}, // search vectors
+		"id",              // vector fields
+		entity.L2,         // metric type
+		options.Topk,      // topK
+		sp,                // search param
 	)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
@@ -131,38 +135,23 @@ func (m *VDB) Close() error {
 }
 
 // 私有辅助方法
-func (m *VDB) ensureCollection() error {
-	ctx := context.Background()
-
-	has, err := m.client.HasCollection(ctx, m.collection)
+func (m *VDB) EnsureCollection(ctx context.Context, cfg Config) error {
+	has, err := m.client.HasCollection(ctx, cfg.Collection)
 	if err != nil {
 		return fmt.Errorf("check collection: %w", err)
 	}
-
-	if !has {
-		schema := &entity.Schema{
-			CollectionName: m.collection,
-			Fields: []*entity.Field{
-				{
-					Name:       "id",
-					DataType:   entity.FieldTypeInt64,
-					PrimaryKey: true,
-					AutoID:     true,
-				},
-				{
-					Name:     "vector_field",
-					DataType: entity.FieldTypeFloatVector,
-					// Dimension: m.dimension,
-				},
-			},
-		}
-
-		err = m.client.CreateCollection(ctx, schema, 1)
-		if err != nil {
-			return fmt.Errorf("create collection: %w", err)
-		}
+	if has {
+		return nil
+	}
+	schema := entity.NewSchema().WithName(cfg.Collection).WithDescription(cfg.Description)
+	for _, f := range cfg.Fields {
+		schema = schema.WithField(entity.NewField().WithName(f.Name).WithDataType(f.Type).WithIsPrimaryKey(f.IsPrimary).WithIsAutoID(f.IsAuto).WithDim(int64(m.dimension)))
 	}
 
+	err = m.client.CreateCollection(ctx, schema, int32(cfg.ShareNum))
+	if err != nil {
+		return fmt.Errorf("create collection: %w", err)
+	}
 	return nil
 }
 

@@ -91,7 +91,7 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 				ID:     strconv.FormatInt(id, 10),
 				Query:  fields[3].(string),
 				Answer: fields[5].(string),
-				Score:  score,
+				Score:  []float64{score},
 				Vector: vector,
 			})
 		}

@@ -19,6 +19,7 @@ type Document struct {
 	ID     string    `json:"id"`
 	Query  string    `json:"query"`
 	Answer string    `json:"answer"`
-	Score  float64   `json:"score"`
+	Score  []float64 `json:"score"`
+	Scores []float32 `json:"scores"`
 	Vector []float64 `json:"vector"`
 }

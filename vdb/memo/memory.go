@@ -64,14 +64,14 @@ func (m *VDB) Search(_ context.Context, vector []float64, options ...vdb.SearchO
 		score := cosineSimilarity(vector, v)
 		scores = append(scores, vdb.Document{
 			ID:     id,
-			Score:  score,
+			Score:  []float64{score},
 			Vector: v,
 		})
 	}
 
 	// 按相似度排序
 	sort.Slice(scores, func(i, j int) bool {
-		return scores[i].Score > scores[j].Score
+		return scores[i].Score[0] > scores[j].Score[0]
 	})
 
 	k := searchOptions.Topk
