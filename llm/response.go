@@ -2,6 +2,8 @@ package llm
 
 import (
 	"bufio"
+	"encoding/json"
+	"errors"
 	"io"
 )
 
@@ -45,7 +47,6 @@ func (resp *Response) Result() *Result {
 	}
 	resp.result.Message = message
 	return resp.result
-
 }
 
 // Result ...
@@ -66,40 +67,84 @@ func (r *Result) String() string {
 func NewChunk(i int, msg *assistantPromptMessage, useage *Usage) *Chunk {
 	return &Chunk{
 		Delta: &ChunkDelta{
-			Index:        i,
 			Message:      msg,
-			Usage:        useage,
 			FinishReason: "",
-			Done:         false,
 		},
 	}
 }
 
+// BuildChunkMessage ...
+func BuildChunkMessage(line []byte) (*Chunk, error) {
+	var mmm struct {
+		ID      string `json:"id"`
+		Object  string `json:"object"`
+		Created int64  `json:"created"`
+		Model   string `json:"model"`
+		Choices []struct {
+			Index int `json:"index"`
+			Delta struct {
+				ReasoningContent string `json:"reasoning_content"`
+				Content          string `json:"content"`
+			} `json:"delta"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+		Usage Usage `json:"usage"`
+	}
+	if err := json.Unmarshal(line, &mmm); err != nil {
+		return nil, err
+	}
+
+	if len(mmm.Choices) < 0 {
+		return nil, errors.New("no choices")
+	}
+	chunk := &Chunk{}
+	chunk.Usage = &mmm.Usage
+	chunk.ID = mmm.ID
+	chunk.CreatedAt = mmm.Created
+	chunk.Model = mmm.Model
+	chunk.Object = mmm.Object
+	// chunk.SystemFingerprint = mmm.SystemFingerprint
+	chunk.Delta = &ChunkDelta{}
+	chunk.Delta.Index = 0
+	if mmm.Choices[0].Delta.ReasoningContent != "" {
+		chunk.Delta.Message = AssistantReasoningMessage(mmm.Choices[0].Delta.ReasoningContent)
+	} else {
+		chunk.Delta.Message = AssistantPromptMessage(mmm.Choices[0].Delta.Content)
+	}
+	chunk.Delta.FinishReason = mmm.Choices[0].FinishReason
+
+	// chunk.Choices = []*ChunkDelta{
+	// 	{Index: 0, Message: chunk.Delta.Message, FinishReason: mmm.Choices[0].FinishReason},
+	// }
+	return chunk, nil
+}
+
 // Chunk ...
 type Chunk struct {
-	Model             string           `json:"model"`
-	Messages          []*PromptMessage `json:"-"`
-	SystemFingerprint string           `json:"system_fingerprint"`
-
-	Delta *ChunkDelta `json:"delta"`
+	ID                string        `json:"id"`
+	CreatedAt         int64         `json:"created_at"`
+	Model             string        `json:"model"`
+	Object            string        `json:"object"`
+	SystemFingerprint string        `json:"system_fingerprint"`
+	Choices           []*ChunkDelta `json:"choices"`
+	Usage             *Usage        `json:"usage"`
+	Delta             *ChunkDelta   `json:"delta"`
 }
 
 // ChunkDelta ...
 type ChunkDelta struct {
 	Index        int                     `json:"index"`
 	Message      *assistantPromptMessage `json:"message"`
-	Usage        *Usage                  `json:"usage"`
 	FinishReason string                  `json:"finish_reason"`
-	Done         bool                    `json:"done"`
 }
 
 // Usage ...
 type Usage struct {
-	PromptTokens     int
-	CompletionTokens int
-	TotalTokens      int
-	Currency         string
-	Latency          float64
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	TotalTokens      int    `json:"total_tokens"`
+	Currency         string `json:"currency"`
+	Latency          int    `json:"latency"`
 }
 
 // Stream ...

@@ -73,7 +73,7 @@ func main() {
 
 	for i := 0; i < len(chunks); i++ {
 		fmt.Println("--------------------")
-		fmt.Printf("c:", pstrings.TrimSpecial(chunks[i]))
+		fmt.Printf("c: %s\n", pstrings.TrimSpecial(chunks[i]))
 		fmt.Printf("    ")
 		fmt.Println(len([]rune(pstrings.TrimSpecial(chunks[i]))))
 	}

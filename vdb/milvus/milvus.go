@@ -67,13 +67,15 @@ func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	searchResult, err := m.client.Search(
 		ctx,
 		m.collection,
-		[]string{},              // partition names
-		"vector_field",          // vector field name
-		[]entity.Vector(vector), // search vectors
-		"id",                    // output fields
-		entity.L2,               // metric type
-		options.Topk,            // topK
-		sp,                      // search param
+		[]string{},     // partition names
+		"vector_field", // vector field name
+		// []entity.Vector(vector), // search vectors
+		nil,
+		nil,
+		"id",         // output fields
+		entity.L2,    // metric type
+		options.Topk, // topK
+		sp,           // search param
 	)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
@@ -83,13 +85,14 @@ func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	var docs []vdb.Document
 	for i := 0; i < len(searchResult); i++ {
 		score := searchResult[i].Scores
-		if score > options.Threshold {
-			docs = append(docs, vdb.Document{
-				ID:     searchResult[i].ID,
-				Score:  score,
-				Vector: vector,
-			})
-		}
+		_ = score
+		// if score > options.Threshold {
+		// 	docs = append(docs, vdb.Document{
+		// 		ID:     searchResult[i].ID,
+		// 		Score:  score,
+		// 		Vector: vector,
+		// 	})
+		// }
 	}
 
 	return docs, nil

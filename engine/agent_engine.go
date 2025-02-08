@@ -104,7 +104,7 @@ func (engine *AgentEngine) Stream(ctx context.Context, input Input) *EventStream
 
 func (engine *AgentEngine) iterate(ctx context.Context,
 	inputs map[string]any, query string, contexts string,
-	tools []llm.Tool, result *EventStream) (string, bool, error) {
+	tools []*llm.Tool, result *EventStream) (string, bool, error) {
 	messages, _ := engine.RenderPromptMessages(ctx, engine.Settings.PresetPrompt, inputs, query, contexts)
 
 	instance := llm.NewInstance(engine.Settings.LLMModel.Provider)

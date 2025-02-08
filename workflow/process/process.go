@@ -1,7 +1,6 @@
 package process
 
 import (
-	wf "github.com/showntop/llmack/workflow"
 	"github.com/showntop/llmack/workflow/dag"
 )
 
@@ -16,9 +15,4 @@ type Process struct {
 	WorkflowID string // process instance id equal workflow id when root
 	RunID      string // workflow id
 	Runner     string
-
-	// 当前状态
-
-	Input  *wf.Vars
-	Output *wf.Vars
 }

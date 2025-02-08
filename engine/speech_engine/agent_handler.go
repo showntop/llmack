@@ -18,11 +18,8 @@ func agentHandler(r *Turn, next Handler) Handler {
 		var vv speech.AgentPayload
 		json.Unmarshal(payload, &vv)
 		// new simple agent
-		agt := agent.SimAgent{LLMProvider: "hunyuan"}
-		result, err := agt.Run(r.Context(), nil, vv.Transcription.Text, true)
-		if err != nil {
-			return err
-		}
+		agt := agent.FunAgent{}
+		result := agt.Run(r.Context())
 
 		resultx, ok := result.(*llm.Stream)
 		if !ok {

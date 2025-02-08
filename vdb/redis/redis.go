@@ -88,7 +88,7 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 		if score > options.Threshold {
 			id, _ := strconv.ParseInt(fields[1].(string), 10, 64)
 			docs = append(docs, vdb.Document{
-				ID:     id,
+				ID:     strconv.FormatInt(id, 10),
 				Query:  fields[3].(string),
 				Answer: fields[5].(string),
 				Score:  score,

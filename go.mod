@@ -21,7 +21,7 @@ require (
 	github.com/openai/openai-go v0.1.0-alpha.45
 	github.com/pdfcpu/pdfcpu v0.9.1
 	github.com/redis/go-redis/v9 v9.7.0
-	github.com/sashabaranov/go-openai v1.36.1
+	github.com/sashabaranov/go-openai v1.37.0
 	github.com/showntop/flatmap v1.1.5
 	github.com/showntop/tencentcloud-speech-sdk-go v1.1.2
 	github.com/showntop/unipdf v0.0.0-20240805134308-7e681d0c4ec3

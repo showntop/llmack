@@ -190,6 +190,7 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 		// 倒腾一遍，for metrics and trace ... and cache
 		result := ""
 		firstChunk := true
+
 		for chunk := response.stream.Next(); chunk != nil; chunk = response.stream.Next() {
 			if firstChunk {
 				for _, hook := range mi.opts.hooks {
@@ -197,12 +198,19 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 				}
 			}
 			firstChunk = false
+
 			newResp.stream.Push(chunk)
-			result += chunk.Delta.Message.content.Data
+			if chunk.Delta.Message.ReasoningContent != "" {
+				result += chunk.Delta.Message.ReasoningContent
+			}
+			if chunk.Delta.Message.content != nil {
+				result += chunk.Delta.Message.content.Data
+			}
 		}
 		if updateCache != nil {
 			updateCache(ctx, result)
 		}
+
 	}()
 	return newResp
 }
