@@ -18,9 +18,9 @@ type MultipartContent struct {
 	Data string
 }
 
-func MultipartContentImage(url string) *MultipartContent {
+func MultipartContentImageURL(url string) *MultipartContent {
 	return &MultipartContent{
-		Type: "image",
+		Type: "image_url",
 		Data: url,
 	}
 }
@@ -59,7 +59,6 @@ func (m PromptMessage) MarshalJSON() ([]byte, error) {
 	}
 	panic("implement it")
 	return nil, nil
-
 }
 
 // Role ...
@@ -89,7 +88,7 @@ func UserTextPromptMessage(text string) PromptMessage {
 }
 
 // UserMultipartPromptMessage ...
-func UserMultipartPromptMessage(contents []*MultipartContent) PromptMessage {
+func UserMultipartPromptMessage(contents ...*MultipartContent) PromptMessage {
 	return PromptMessage{
 		role:             PromptMessageRoleUser,
 		multiPartContent: contents,

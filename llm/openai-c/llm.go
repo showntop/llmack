@@ -52,7 +52,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 					if parts[i].Type == "text" {
 						partsOpenAI = append(partsOpenAI, openai.TextPart(parts[i].Data))
 					}
-					if parts[i].Type == "image" {
+					if parts[i].Type == "image_url" {
 						partsOpenAI = append(partsOpenAI, openai.ImagePart(parts[i].Data))
 					}
 				}

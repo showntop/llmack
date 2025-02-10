@@ -23,10 +23,10 @@ func main() {
 	})
 
 	resp, err := llm.NewInstance(openaic.Name).Invoke(ctx, []llm.Message{
-		llm.UserMultipartPromptMessage([]*llm.MultipartContent{
-			llm.MultipartContentImage("https://img.tukuppt.com/bg_grid/05/37/54/v40ZCaqERa.jpg!/fh/350"),
+		llm.UserMultipartPromptMessage(
+			llm.MultipartContentImageURL("https://img.tukuppt.com/bg_grid/05/37/54/v40ZCaqERa.jpg!/fh/350"),
 			llm.MultipartContentText("给这张图片添加一个太阳"),
-		}),
+		),
 	},
 		llm.WithModel("hunyuan-vision"),
 		llm.WithStream(true),

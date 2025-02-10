@@ -6,8 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -56,7 +56,7 @@ func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("OAILLM ChatCompletions payload: ", string(payload))
+	log.Println("OAILLM ChatCompletions request payload ", string(payload)) // for debug
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", o.baseURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
@@ -82,11 +82,13 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 	request.InvokeOptions = options
 	// messages
 	for _, m := range messages {
-		request.Messages = append(request.Messages, &ChatCompletionMessage{
+		msg := &ChatCompletionMessage{
 			Role:       string(m.Role()),
-			Content:    m.Content(),
 			ToolCallID: m.ToolID(),
-		})
+		}
+		msg.Content = m.Content()
+		msg.MultipartContent = m.MultipartContent()
+		request.Messages = append(request.Messages, msg)
 	}
 	if len(options.Tools) <= 0 {
 		return request
