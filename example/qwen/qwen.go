@@ -33,7 +33,7 @@ func runWithCache() {
 	)
 
 	resp, err := instance.Invoke(ctx,
-		[]llm.Message{llm.UserPromptMessage("你好")},
+		[]llm.Message{llm.UserTextPromptMessage("你好")},
 		llm.WithModel("qwen-vl-plus"),
 		llm.WithStream(true),
 	)
@@ -43,7 +43,7 @@ func runWithCache() {
 	fmt.Println(resp.Result())
 
 	resp, err = instance.Invoke(ctx,
-		[]llm.Message{llm.UserPromptMessage("你好")},
+		[]llm.Message{llm.UserTextPromptMessage("你好")},
 		llm.WithModel("qwen-vl-plus"),
 		llm.WithStream(true),
 	)

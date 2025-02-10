@@ -39,7 +39,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 	for _, m := range messages {
 		internalMessages = append(internalMessages, zhipu.ChatCompletionMessage{
 			Role:       string(m.Role()),
-			Content:    m.Content().Data,
+			Content:    m.Content(),
 			ToolCallID: m.ToolID(),
 		})
 	}

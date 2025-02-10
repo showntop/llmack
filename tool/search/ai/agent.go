@@ -69,7 +69,7 @@ func (a *Agent) exec(ctx context.Context, query string, stream chan any) {
 		})
 
 		for v := answers.Next(); v != nil; v = answers.Next() {
-			stream <- tool.Event{Name: "answer", Type: "answer", Data: v.Delta.Message.Content().Data}
+			stream <- tool.Event{Name: "answer", Type: "answer", Data: v.Delta.Message.Content()}
 		}
 		close(stream)
 		return
@@ -99,7 +99,7 @@ func (a *Agent) handleHybridSearch(ctx context.Context, query string, stream cha
 		"history_messages": "",
 	})
 	for v := answers.Next(); v != nil; v = answers.Next() {
-		stream <- tool.Event{Name: "answer", Type: "answer", Data: v.Delta.Message.Content().Data}
+		stream <- tool.Event{Name: "answer", Type: "answer", Data: v.Delta.Message.Content()}
 	}
 
 	// related
@@ -109,7 +109,7 @@ func (a *Agent) handleHybridSearch(ctx context.Context, query string, stream cha
 		"search_results": result,
 	})
 	for v := related.Next(); v != nil; v = related.Next() {
-		stream <- tool.Event{Name: "related", Type: "related", Data: v.Delta.Message.Content().Data}
+		stream <- tool.Event{Name: "related", Type: "related", Data: v.Delta.Message.Content()}
 	}
 	// images
 	result, err = a.imageSearcher.Search(ctx, query)

@@ -52,7 +52,7 @@ func (engine *AgentEngine) RenderPromptMessages(ctx context.Context, preset stri
 		messages = append(messages, histories...)
 	}
 
-	messages = append(messages, llm.UserPromptMessage(query)) // 本次 query
+	messages = append(messages, llm.UserTextPromptMessage(query)) // 本次 query
 
 	messages = append(messages, engine.thoughs...)
 	return messages, nil
@@ -125,7 +125,7 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 				toolCalls = append(toolCalls, *r.Delta.Message.ToolCalls[i])
 			}
 		} else {
-			response += r.Delta.Message.Content().Data
+			response += r.Delta.Message.Content()
 			result.Push(ToastEvent(r))
 		}
 	}
@@ -196,7 +196,7 @@ func (engine *AgentEngine) Invoke(ctx context.Context, input Input) (any, error)
 			finish = true
 		}
 		_ = err
-		finalAnswer += response.Result().Message.Content().Data
+		finalAnswer += response.Result().Message.Content()
 		// resultChan <- result
 	}
 
@@ -250,7 +250,7 @@ func (engine *AgentEngine) renderContexts(ctx context.Context, settings *Setting
 		histories := engine.FetchHistoryMessages(ctx)
 		for _, history := range histories {
 			if history.Role() == llm.PromptMessageRoleUser {
-				query += history.Content().Data
+				query += history.Content()
 			}
 		}
 		kns, err := engine.opts.Rag.Retrieve(ctx, query, &rag.Options{

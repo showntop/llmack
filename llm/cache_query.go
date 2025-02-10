@@ -9,7 +9,7 @@ type QueryProcessor func([]Message) (string, error)
 
 // LastQueryMessage ...
 func LastQueryMessage(messages []Message) (string, error) {
-	return messages[len(messages)-1].Content().Data, nil
+	return messages[len(messages)-1].Content(), nil // TODO when with multipart content
 }
 
 // ConcatQueryMessage ...
@@ -18,7 +18,7 @@ func ConcatQueryMessage(messages []Message) (string, error) {
 	for i := 0; i < len(messages); i++ {
 		builder.WriteString(string(messages[i].Role()))
 		builder.WriteByte(':')
-		builder.WriteString(messages[i].Content().Data)
+		builder.WriteString(messages[i].Content())
 	}
 	return builder.String(), nil
 }
@@ -29,7 +29,7 @@ func CompressQueryMessage(messages []Message) (string, error) {
 	for i := 0; i < len(messages); i++ {
 		builder.WriteString(string(messages[i].Role()))
 		builder.WriteByte(':')
-		builder.WriteString(messages[i].Content().Data)
+		builder.WriteString(messages[i].Content())
 	}
 	return builder.String(), nil
 }

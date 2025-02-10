@@ -84,7 +84,7 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 	for _, m := range messages {
 		request.Messages = append(request.Messages, &ChatCompletionMessage{
 			Role:       string(m.Role()),
-			Content:    m.Content().Data,
+			Content:    m.Content(),
 			ToolCallID: m.ToolID(),
 		})
 	}

@@ -116,7 +116,7 @@ func (r *BotEngine) FetchHistoryMessages(ctx context.Context) []llm.Message {
 	}
 
 	for _, m := range messages {
-		if m.Content().Data == "" {
+		if m.Content() == "" {
 			continue
 		}
 		r.HistoryMessages = append(r.HistoryMessages, m)
@@ -140,7 +140,7 @@ func (r *BotEngine) RenderMessages(ctx context.Context, preset string,
 	}
 
 	// query
-	messages = append(messages, llm.UserPromptMessage(query))
+	messages = append(messages, llm.UserTextPromptMessage(query))
 	return messages, stops
 }
 

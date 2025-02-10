@@ -13,40 +13,53 @@ const (
 	PromptMessageRoleTool      PromptMessageRole = "tool"
 )
 
-// PromptMessageContent ...
-type PromptMessageContent struct {
-	Type int    `json:"type"`
-	Data string `json:"data"`
+type MultipartContent struct {
+	Type string
+	Data string
+}
+
+func MultipartContentImage(url string) *MultipartContent {
+	return &MultipartContent{
+		Type: "image",
+		Data: url,
+	}
+}
+
+func MultipartContentText(text string) *MultipartContent {
+	return &MultipartContent{
+		Type: "text",
+		Data: text,
+	}
 }
 
 // PromptMessage ...
 type PromptMessage struct {
-	role    PromptMessageRole
-	content *PromptMessageContent
-	Name    string
+	role             PromptMessageRole
+	content          string              // string | []*PromptMessageContent
+	multiPartContent []*MultipartContent // string | []*PromptMessageContent
+	Name             string
+}
+
+func (m PromptMessage) Content() string {
+	return m.content
+}
+
+func (m PromptMessage) MultipartContent() []*MultipartContent {
+	return m.multiPartContent
+}
+
+func (m PromptMessage) String() string {
+	return "fsf"
 }
 
 // MarshalJSON 实现marshal
 func (m PromptMessage) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`{"role":"%s","content":"%s"}`, m.role, m.content.Data)), nil
-}
-
-// UnmarshalJSON 实现unmarshal
-func (m *PromptMessage) UnmarshalJSON(data []byte) error {
-	// return json.Unmarshal(data, m)
-	return nil
-}
-
-func (m PromptMessage) String() string {
-	if m.content == nil {
-		return fmt.Sprintf("%s: %s", m.role, "")
+	if m.content != "" {
+		return []byte(fmt.Sprintf(`{"role":"%s","content":"%s"}`, m.role, m.content)), nil
 	}
-	return fmt.Sprintf("%s: %s", m.role, m.content.Data)
-}
+	panic("implement it")
+	return nil, nil
 
-// Content ...
-func (m PromptMessage) Content() *PromptMessageContent {
-	return m.content
 }
 
 // Role ...
@@ -63,22 +76,30 @@ func (m PromptMessage) ToolID() string {
 func SystemPromptMessage(text string) PromptMessage {
 	return PromptMessage{
 		role:    PromptMessageRoleSystem,
-		content: TextPromptMessageContent(text),
+		content: text,
 	}
 }
 
-// UserPromptMessage ...
-func UserPromptMessage(text string) PromptMessage {
+// UserTextPromptMessage ...
+func UserTextPromptMessage(text string) PromptMessage {
 	return PromptMessage{
 		role:    PromptMessageRoleUser,
-		content: TextPromptMessageContent(text),
+		content: text,
+	}
+}
+
+// UserMultipartPromptMessage ...
+func UserMultipartPromptMessage(contents []*MultipartContent) PromptMessage {
+	return PromptMessage{
+		role:             PromptMessageRoleUser,
+		multiPartContent: contents,
 	}
 }
 
 // AssistantPromptMessage ...
 func AssistantPromptMessage(text string) *assistantPromptMessage {
 	m := &assistantPromptMessage{PromptMessage: PromptMessage{}}
-	m.content = TextPromptMessageContent(text)
+	m.content = text
 	m.role = PromptMessageRoleAssistant
 	return m
 }
@@ -105,16 +126,11 @@ func ToolPromptMessage(text string, toolID string) *toolPromptMessage {
 	return &toolPromptMessage{
 		PromptMessage: PromptMessage{
 			role:    PromptMessageRoleTool,
-			content: TextPromptMessageContent(text),
+			content: text,
 			Name:    toolID,
 		},
 		toolID: toolID,
 	}
-}
-
-// TextPromptMessageContent ...
-func TextPromptMessageContent(text string) *PromptMessageContent {
-	return &PromptMessageContent{Data: text}
 }
 
 // assistantPromptMessage ...
@@ -128,10 +144,7 @@ func (m *assistantPromptMessage) String() string {
 	if m.ReasoningContent != "" {
 		return fmt.Sprintf("%s: reasoning: %s", m.role, m.ReasoningContent)
 	}
-	if m.content == nil {
-		return fmt.Sprintf("%s: %s", m.role, "")
-	}
-	return fmt.Sprintf("%s: %s", m.role, m.content.Data)
+	return fmt.Sprintf("%s: %s", m.role, m.content)
 }
 
 // toolPromptMessage ...
@@ -163,7 +176,8 @@ type Messages[T PromptMessage | assistantPromptMessage] []T
 
 // Message ...
 type Message interface {
-	Content() *PromptMessageContent
+	Content() string
+	MultipartContent() []*MultipartContent
 	Role() PromptMessageRole
 	ToolID() string
 	String() string

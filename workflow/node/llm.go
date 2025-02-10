@@ -23,7 +23,7 @@ func NewLLMNode(n *workflow.Node) *LLMNode {
 func (n *LLMNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, error) {
 	// 解析metadata，获取模型配置
 	model := llm.NewInstance("zhipu")
-	messages := []llm.Message{llm.SystemPromptMessage(" "), llm.UserPromptMessage("content")}
+	messages := []llm.Message{llm.SystemPromptMessage(" "), llm.UserTextPromptMessage("content")}
 	model.Invoke(ctx, messages, nil)
 	return nil, nil
 }

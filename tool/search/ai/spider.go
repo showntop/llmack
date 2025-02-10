@@ -35,14 +35,14 @@ func (s *Spider) Needed(ctx context.Context, query, abstract string) (bool, erro
 
 	model := llm.NewInstance("openai")
 	response, err := model.Invoke(ctx, []llm.Message{
-		llm.SystemPromptMessage(" "), llm.UserPromptMessage(p),
+		llm.SystemPromptMessage(" "), llm.UserTextPromptMessage(p),
 	}, nil,
 		llm.WithModel("hunyuan-standard"),
 	)
 	if err != nil {
 		return false, fmt.Errorf("invoke llm failed: %v", err)
 	}
-	return response.Result().Message.Content().Data == "0", nil
+	return response.Result().Message.Content() == "0", nil
 }
 
 // Crawl 爬取网页

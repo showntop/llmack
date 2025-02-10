@@ -186,7 +186,7 @@ func (p *predictor) Result(ctx context.Context, value any) error {
 	if err != nil {
 		return err
 	}
-	completion := response.Result().Message.Content().Data
+	completion := response.Result().Message.Content()
 	log.InfoContextf(ctx, "response: %s", completion)
 
 	return p.adapter.Parse(completion, value)

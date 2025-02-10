@@ -41,16 +41,16 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 	for _, m := range messages {
 		if m.Role() == llm.PromptMessageRoleSystem {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestSystemMessage{
-				Content: azopenai.NewChatRequestSystemMessageContent(m.Content().Data)})
+				Content: azopenai.NewChatRequestSystemMessageContent(m.Content())})
 		} else if m.Role() == llm.PromptMessageRoleAssistant {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestAssistantMessage{
-				Content: azopenai.NewChatRequestAssistantMessageContent(m.Content().Data)})
+				Content: azopenai.NewChatRequestAssistantMessageContent(m.Content())})
 		} else if m.Role() == llm.PromptMessageRoleUser {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestUserMessage{
-				Content: azopenai.NewChatRequestUserMessageContent(m.Content().Data)})
+				Content: azopenai.NewChatRequestUserMessageContent(m.Content())})
 		} else if m.Role() == llm.PromptMessageRoleTool {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestToolMessage{
-				Content: azopenai.NewChatRequestToolMessageContent(m.Content().Data)})
+				Content: azopenai.NewChatRequestToolMessageContent(m.Content())})
 		} else {
 			continue
 		}

@@ -45,7 +45,7 @@ func (r *ChatEngine) Stream(ctx context.Context, input Input) *EventStream {
 	go func() {
 		final := ""
 		for r := response.Stream().Next(); r != nil; r = response.Stream().Next() {
-			final += r.Delta.Message.Content().Data
+			final += r.Delta.Message.Content()
 			estm.Push(ToastEvent(r))
 		}
 		estm.Push(EndEvent(final))

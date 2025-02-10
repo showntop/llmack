@@ -1,0 +1,41 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/joho/godotenv"
+	"github.com/showntop/llmack/llm"
+	openaic "github.com/showntop/llmack/llm/openai-c"
+)
+
+func init() {
+	godotenv.Load()
+}
+
+func main() {
+	ctx := context.Background()
+
+	llm.WithSingleConfig(map[string]any{
+		"base_url": os.Getenv("hunyuan_base_url"),
+		"api_key":  os.Getenv("hunyuan_api_key"),
+	})
+
+	resp, err := llm.NewInstance(openaic.Name).Invoke(ctx, []llm.Message{
+		llm.UserMultipartPromptMessage([]*llm.MultipartContent{
+			llm.MultipartContentImage("https://img.tukuppt.com/bg_grid/05/37/54/v40ZCaqERa.jpg!/fh/350"),
+			llm.MultipartContentText("给这张图片添加一个太阳"),
+		}),
+	},
+		llm.WithModel("hunyuan-vision"),
+		llm.WithStream(true),
+	)
+
+	if err != nil {
+		panic(err)
+	}
+	for it := resp.Stream().Next(); it != nil; it = resp.Stream().Next() {
+		fmt.Println("final: ", it.Delta.Message)
+	}
+}
