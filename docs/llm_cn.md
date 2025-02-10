@@ -15,7 +15,8 @@ type Provider interface {
 ### 消息类型
 ```go
 type Message interface {
-    Content() *PromptMessageContent
+    Content() string
+    MultipartContent() PromptMessageContent
     Role() PromptMessageRole
     ToolID() string
     String() string
