@@ -70,7 +70,7 @@ func (engine *ProxyEngine) Stream(ctx context.Context, input Input) *EventStream
 		}
 		_ = output
 		msg := llm.AssistantPromptMessage("answer")
-		resultChan.Push(EndEvent(msg.Content().Data))
+		resultChan.Push(EndEvent(msg.Content()))
 	}()
 
 	return resultChan

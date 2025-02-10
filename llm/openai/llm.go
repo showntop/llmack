@@ -38,13 +38,13 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 	var messagesOpenAI []openai.ChatCompletionMessageParamUnion
 	for _, m := range messages {
 		if m.Role() == llm.PromptMessageRoleSystem {
-			messagesOpenAI = append(messagesOpenAI, openai.SystemMessage(m.Content().Data))
+			messagesOpenAI = append(messagesOpenAI, openai.SystemMessage(m.Content()))
 		} else if m.Role() == llm.PromptMessageRoleAssistant {
-			messagesOpenAI = append(messagesOpenAI, openai.AssistantMessage(m.Content().Data))
+			messagesOpenAI = append(messagesOpenAI, openai.AssistantMessage(m.Content()))
 		} else if m.Role() == llm.PromptMessageRoleUser {
-			messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content().Data))
+			messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content()))
 		} else if m.Role() == llm.PromptMessageRoleTool {
-			messagesOpenAI = append(messagesOpenAI, openai.ToolMessage(m.Content().Data, m.ToolID()))
+			messagesOpenAI = append(messagesOpenAI, openai.ToolMessage(m.Content(), m.ToolID()))
 		} else {
 			continue
 		}

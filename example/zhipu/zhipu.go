@@ -22,7 +22,7 @@ func main() {
 	})
 
 	resp, err := llm.NewInstance(zhipu.Name).Invoke(ctx,
-		[]llm.Message{llm.UserPromptMessage("你好")},
+		[]llm.Message{llm.UserTextPromptMessage("你好")},
 		llm.WithModel("GLM-4-Flash"))
 	if err != nil {
 		panic(err)

@@ -28,7 +28,7 @@ func agentHandler(r *Turn, next Handler) Handler {
 		go func() {
 			first := true
 			for chunk := resultx.Next(); chunk != nil; chunk = resultx.Next() {
-				payload := speech.ResponsePayload{Text: chunk.Delta.Message.Content().Data, First: first}
+				payload := speech.ResponsePayload{Text: chunk.Delta.Message.Content(), First: first}
 				raw, _ := json.Marshal(payload)
 				next(r.engine.newMessage(raw).WithTurnID(msg.TurnID))
 				first = false

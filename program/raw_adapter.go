@@ -26,7 +26,7 @@ func (ada *RawAdapter) Format(p *predictor, inputs map[string]any, _ any) ([]llm
 	userPromptBuilder.WriteByte('\n')
 
 	messages := []llm.Message{
-		llm.UserPromptMessage(userPromptBuilder.String()),
+		llm.UserTextPromptMessage(userPromptBuilder.String()),
 	}
 	return messages, nil
 }

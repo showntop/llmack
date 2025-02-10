@@ -45,7 +45,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 	for _, m := range messages {
 		req.Messages = append(req.Messages, &moonshot.ChatCompletionsMessage{
 			Role:       moonshot.ChatCompletionsMessageRole(m.Role()),
-			Content:    m.Content().Data,
+			Content:    m.Content(),
 			ToolCallID: m.ToolID(),
 		})
 	}

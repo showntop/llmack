@@ -41,10 +41,11 @@ func (resp *Response) Stream() *Stream {
 func (resp *Response) Result() *Result {
 	resp.result = &Result{}
 	// 合并 message
-	message := AssistantPromptMessage("")
+	text := ""
 	for it := resp.stream.Next(); it != nil; it = resp.stream.Next() {
-		message.content.Data += it.Delta.Message.content.Data
+		text += it.Delta.Message.content
 	}
+	message := AssistantPromptMessage(text)
 	resp.result.Message = message
 	return resp.result
 }
@@ -60,7 +61,7 @@ type Result struct {
 
 // String ...
 func (r *Result) String() string {
-	return r.Message.content.Data
+	return r.Message.String()
 }
 
 // NewChunk ...

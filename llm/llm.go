@@ -173,7 +173,7 @@ func (mi *Instance) handleBlockResponse(ctx context.Context, response *Response,
 		return response
 	}
 	if updateCache != nil {
-		updateCache(ctx, response.result.Message.Content().Data)
+		updateCache(ctx, response.result.Message.content) // TODO
 	}
 	return response
 }
@@ -203,9 +203,7 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 			if chunk.Delta.Message.ReasoningContent != "" {
 				result += chunk.Delta.Message.ReasoningContent
 			}
-			if chunk.Delta.Message.content != nil {
-				result += chunk.Delta.Message.content.Data
-			}
+			result += chunk.Delta.Message.content
 		}
 		if updateCache != nil {
 			updateCache(ctx, result)

@@ -40,7 +40,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 		role := string(m.Role())
 		request.Messages = append(request.Messages, &hunyuan.Message{
 			Role:    &role,
-			Content: &m.Content().Data,
+			Content: common.StringPtr(m.Content()),
 		})
 	}
 	// tools

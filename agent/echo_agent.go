@@ -15,7 +15,7 @@ type EchoAgent struct {
 // 一轮对话
 // 历史消息，query
 func (a *EchoAgent) Run(ctx context.Context, messages []llm.Message, query string, stream bool) (any, error) {
-	messages = append(messages, llm.UserPromptMessage(query))
+	messages = append(messages, llm.UserTextPromptMessage(query))
 	if stream {
 		stream := llm.NewStream()
 		stream.Push(llm.NewChunk(0, llm.AssistantPromptMessage(query), nil))

@@ -14,7 +14,7 @@ func generate(ctx context.Context, prompt string, inputs map[string]any) string 
 	query := formatter.Format(inputs, true)
 	// core.SetLogger(&core.WrapLogger{})
 	result, err := llm.NewInstance(oaic.Name).Invoke(context.Background(), []llm.Message{
-		llm.SystemPromptMessage(" "), llm.UserPromptMessage(query),
+		llm.SystemPromptMessage(" "), llm.UserTextPromptMessage(query),
 	}, nil,
 		llm.WithModel("hunyuan-standard"),
 	)
@@ -24,7 +24,7 @@ func generate(ctx context.Context, prompt string, inputs map[string]any) string 
 
 	final := ""
 	for v := result.Stream().Next(); v != nil; v = result.Stream().Next() {
-		final += string(v.Delta.Message.Content().Data)
+		final += string(v.Delta.Message.Content())
 	}
 
 	return final
@@ -36,7 +36,7 @@ func streamx(ctx context.Context, prompt string, inputs map[string]any) *llm.Str
 	query := formatter.Format(inputs, true)
 
 	result, err := llm.NewInstance(oaic.Name).Invoke(context.Background(), []llm.Message{
-		llm.SystemPromptMessage(" "), llm.UserPromptMessage(query),
+		llm.SystemPromptMessage(" "), llm.UserTextPromptMessage(query),
 	}, nil,
 		llm.WithModel("hunyuan-standard"),
 	)

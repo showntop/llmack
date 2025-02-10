@@ -212,7 +212,7 @@ func metric(ex *optimizer.Example, actualx any) float64 {
 
 func testProgram(ctx context.Context, prompt string) (string, error) {
 	messages := []llm.Message{
-		llm.UserPromptMessage(prompt),
+		llm.UserTextPromptMessage(prompt),
 	}
 	instance := llm.NewInstance(LLMProvider, llm.WithLogger(&mlog.WrapLogger{}))
 	response, err := instance.Invoke(ctx, messages, nil,
@@ -221,7 +221,7 @@ func testProgram(ctx context.Context, prompt string) (string, error) {
 	if err != nil {
 		panic(err)
 	}
-	return response.Result().Message.Content().Data, nil
+	return response.Result().Message.Content(), nil
 	// actual :=
 	// score := e.metric(actual, ex.Answer)
 	// return score

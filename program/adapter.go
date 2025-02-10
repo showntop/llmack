@@ -90,7 +90,7 @@ func (ada *MarkableAdapter) Format(p *predictor, inputs map[string]any) ([]llm.M
 
 	messages := []llm.Message{
 		llm.SystemPromptMessage(sysPromptBuilder.String()),
-		llm.UserPromptMessage(userPromptBuilder.String()),
+		llm.UserTextPromptMessage(userPromptBuilder.String()),
 	}
 	return messages, nil
 }
@@ -234,7 +234,7 @@ func (ada *JSONAdapter) Format(p *predictor, inputs map[string]any, target any) 
 
 	messages := []llm.Message{
 		llm.SystemPromptMessage(sysPromptBuilder.String()),
-		llm.UserPromptMessage(userPromptBuilder.String()),
+		llm.UserTextPromptMessage(userPromptBuilder.String()),
 	}
 	return messages, nil
 }

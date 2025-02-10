@@ -33,8 +33,14 @@ func runWithCache() {
 	)
 
 	resp, err := instance.Invoke(ctx,
-		[]llm.Message{llm.UserPromptMessage("你好")},
-		llm.WithModel("qwen-vl-plus"),
+		[]llm.Message{
+			llm.UserTextPromptMessage("你好"),
+			llm.UserMultipartPromptMessage(
+				llm.MultipartContentImageURL("https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg"),
+				llm.MultipartContentText("这是一张关于猫的照片吗"),
+			),
+		},
+		llm.WithModel("qwen-vl-max-latest"),
 		llm.WithStream(true),
 	)
 	if err != nil {
@@ -43,8 +49,8 @@ func runWithCache() {
 	fmt.Println(resp.Result())
 
 	resp, err = instance.Invoke(ctx,
-		[]llm.Message{llm.UserPromptMessage("你好")},
-		llm.WithModel("qwen-vl-plus"),
+		[]llm.Message{llm.UserTextPromptMessage("你好")},
+		llm.WithModel("qwen-vl-max-latest"),
 		llm.WithStream(true),
 	)
 	if err != nil {

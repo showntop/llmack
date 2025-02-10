@@ -34,7 +34,7 @@ func main() {
 			panic(evt.Error)
 		}
 		if cv, ok := evt.Data.(*llm.Chunk); ok {
-			fmt.Println("main chunk:", cv.Delta.Message.Content().Data)
+			fmt.Println("main chunk:", cv.Delta.Message.Content())
 		} else {
 			fmt.Println("main event name:", evt.Name, "data:", evt.Data)
 		}

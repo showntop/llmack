@@ -152,7 +152,7 @@ func (r *Ranker) RankWithLLM(query string, docs []*search.Result, topK int, cutO
 		return nil, err
 	}
 	// 调用LLM生成结果
-	messages := append([]llm.Message{llm.SystemPromptMessage(" ")}, llm.UserPromptMessage(prompt))
+	messages := append([]llm.Message{llm.SystemPromptMessage(" ")}, llm.UserTextPromptMessage(prompt))
 	response, err := llm.NewInstance("openai").Invoke(context.Background(), messages, nil, llm.WithModel("hunyuan-standard"))
 	if err != nil {
 		log.ErrorContextf(context.Background(), "invoke llm with messages: %+v, error: %+v", messages, err)

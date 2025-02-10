@@ -272,7 +272,7 @@ func (o *CritiqueNOptimizer) chatCompletion(ctx context.Context, template string
 
 	messages := []llm.Message{
 		llm.SystemPromptMessage(" "),
-		llm.UserPromptMessage(userPrompt),
+		llm.UserTextPromptMessage(userPrompt),
 	}
 
 	response, err := o.model.Invoke(ctx, messages, nil,
@@ -282,5 +282,5 @@ func (o *CritiqueNOptimizer) chatCompletion(ctx context.Context, template string
 	if err != nil {
 		panic(err)
 	}
-	return response.Result().Message.Content().Data
+	return response.Result().Message.Content()
 }
