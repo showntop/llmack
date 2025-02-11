@@ -22,8 +22,15 @@ func main() {
 	})
 
 	resp, err := llm.NewInstance(zhipu.Name).Invoke(ctx,
-		[]llm.Message{llm.UserTextPromptMessage("你好")},
-		llm.WithModel("GLM-4-Flash"))
+		[]llm.Message{
+			// llm.UserTextPromptMessage("你好"),
+			llm.UserMultipartPromptMessage(
+				llm.MultipartContentImageURL("https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg"),
+				llm.MultipartContentText("这是一张关于猫的照片吗"),
+			),
+		},
+
+		llm.WithModel("glm-4v-plus"))
 	if err != nil {
 		panic(err)
 	}
