@@ -2,6 +2,7 @@ package zhipu
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/openai/openai-go"
@@ -37,13 +38,37 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 
 	internalMessages := []zhipu.ChatCompletionMessageType{}
 	for _, m := range messages {
-		internalMessages = append(internalMessages, zhipu.ChatCompletionMessage{
-			Role:       string(m.Role()),
-			Content:    m.Content(),
-			ToolCallID: m.ToolID(),
-		})
+		if m.Content() != "" {
+			internalMessages = append(internalMessages, zhipu.ChatCompletionMessage{
+				Role:       string(m.Role()),
+				Content:    m.Content(),
+				ToolCallID: m.ToolID(),
+			})
+		}
+		if len(m.MultipartContent()) > 0 {
+			contents := []zhipu.ChatCompletionMultiContent{}
+			for _, m := range m.MultipartContent() {
+				part := zhipu.ChatCompletionMultiContent{
+					Type: m.Type,
+				}
+				if m.Type == "image_url" {
+					part.ImageURL = &zhipu.URLItem{
+						URL: m.Data,
+					}
+				}
+				if m.Type == "text" {
+					part.Text = m.Data
+				}
+				contents = append(contents, part)
+			}
+			internalMessages = append(internalMessages, zhipu.ChatCompletionMultiMessage{
+				Role:    string(m.Role()),
+				Content: contents,
+			})
+		}
 	}
-
+	raw, _ := json.Marshal(internalMessages)
+	fmt.Println(string(raw))
 	var internalTools []zhipu.ChatCompletionTool
 	for _, t := range opts.Tools {
 		internalTools = append(internalTools, zhipu.ChatCompletionToolFunction{
