@@ -19,8 +19,8 @@ func NewChatEngine(settings *Settings, opts ...Option) *ChatEngine {
 	return r
 }
 
-// Stream ... return channel
-func (r *ChatEngine) Stream(ctx context.Context, input Input) *EventStream {
+// Execute ... return channel
+func (r *ChatEngine) Execute(ctx context.Context, input Input) *EventStream {
 	settings := r.Settings
 	estm := NewEventStream()
 

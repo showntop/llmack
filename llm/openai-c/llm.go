@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -42,7 +43,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 			messagesOpenAI = append(messagesOpenAI, openai.AssistantMessage(m.Content()))
 		} else if m.Role() == llm.PromptMessageRoleUser {
 			if m.Content() != "" {
-				// messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content()))
+				messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content()))
 			}
 			if len(m.MultipartContent()) > 0 {
 				parts := m.MultipartContent()
@@ -96,16 +97,16 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 
 		for stream.Next() {
 			chunk := stream.Current()
-			// fmt.Println(chunk)
-			mmm := llm.AssistantPromptMessage(chunk.Choices[0].Delta.Content)
-			acc.AddChunk(chunk)
-			// When this fires, the current chunk value will not contain content data
-			if _, ok := acc.JustFinishedContent(); ok {
-				break
+			if !acc.AddChunk(chunk) { // error dismatch
+				return // error
+			}
+			if _, ok := acc.JustFinishedContent(); len(chunk.Choices[0].Delta.ToolCalls) > 0 && !ok {
+				continue
 			}
 
+			mmm := llm.AssistantPromptMessage(chunk.Choices[0].Delta.Content)
+
 			if tool, ok := acc.JustFinishedToolCall(); ok {
-				// println("Tool call stream finished:", tool.Index, tool.Name, tool.Arguments)
 				call := acc.Choices[0].Message.ToolCalls[tool.Index]
 				mmm.ToolCalls = append(mmm.ToolCalls, &llm.ToolCall{
 					ID:   call.ID,
@@ -117,13 +118,13 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 				})
 			}
 
+			// When this fires, the current chunk value will not contain content data
+			if _, ok := acc.JustFinishedContent(); ok {
+				break
+			}
+
 			// if refusal, ok := acc.JustFinishedRefusal(); ok {
 			// 	println("Refusal stream finished:", refusal)
-			// }
-
-			// It's best to use chunks after handling JustFinished events
-			// if len(chunk.Choices) > 0 {
-			// 	println(chunk.Choices[0].Delta.JSON.RawJSON())
 			// }
 
 			response.Stream().Push(llm.NewChunk(0, mmm, nil))
@@ -143,6 +144,9 @@ func (m *LLM) setupClient() error {
 	}
 	baseURL, _ := config["base_url"].(string)
 	apiKey, _ := config["api_key"].(string)
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
+	}
 	client := openai.NewClient(
 		option.WithAPIKey(apiKey),
 		option.WithBaseURL(baseURL),

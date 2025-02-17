@@ -6,15 +6,18 @@ import (
 	"github.com/showntop/llmack/tool"
 )
 
+const QueryWeather = "QueryWeather"
+
 func init() {
-	t := tool.CodeTool{}
-	t.Meta.Name = "weather"
-	t.Meta.Description = "weather"
-	t.Meta.Parameters = append(t.Meta.Parameters, tool.Parameter{
+	t := &tool.Tool{}
+	t.Name = QueryWeather
+	t.Kind = "code"
+	t.Description = "查询天气"
+	t.Parameters = append(t.Parameters, tool.Parameter{
 		Name: "city", Type: tool.String, Required: true, LLMDescrition: "城市", Default: "北京",
 	})
 	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
 		return "晴朗", nil
 	}
-	tool.Register(t.Name(), &t)
+	tool.Register(t)
 }

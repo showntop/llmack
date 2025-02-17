@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -143,7 +144,8 @@ func (m *assistantPromptMessage) String() string {
 	if m.ReasoningContent != "" {
 		return fmt.Sprintf("%s: reasoning: %s", m.role, m.ReasoningContent)
 	}
-	return fmt.Sprintf("%s: %s", m.role, m.content)
+	raw, _ := json.Marshal(m.ToolCalls)
+	return fmt.Sprintf("%s => (content:%s, tool_calls: %+v)", m.role, m.content, string(raw))
 }
 
 // toolPromptMessage ...
