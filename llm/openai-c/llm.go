@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -42,7 +43,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 			messagesOpenAI = append(messagesOpenAI, openai.AssistantMessage(m.Content()))
 		} else if m.Role() == llm.PromptMessageRoleUser {
 			if m.Content() != "" {
-				// messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content()))
+				messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content()))
 			}
 			if len(m.MultipartContent()) > 0 {
 				parts := m.MultipartContent()
@@ -143,6 +144,9 @@ func (m *LLM) setupClient() error {
 	}
 	baseURL, _ := config["base_url"].(string)
 	apiKey, _ := config["api_key"].(string)
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
+	}
 	client := openai.NewClient(
 		option.WithAPIKey(apiKey),
 		option.WithBaseURL(baseURL),

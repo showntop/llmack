@@ -2,8 +2,6 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	stdstrs "strings"
 
 	"github.com/showntop/llmack/llm"
@@ -25,6 +23,8 @@ type AgentEngine struct {
 func NewAgentEngine(settings *Settings, opts ...Option) Engine {
 	r := &AgentEngine{}
 	r.BotEngine = *NewBotEngine(opts...)
+	// load tools
+
 	r.Settings = settings
 	return r
 }
@@ -58,9 +58,9 @@ func (engine *AgentEngine) RenderPromptMessages(ctx context.Context, preset stri
 	return messages, nil
 }
 
-// Stream ... return channel
+// Execute ... return channel
 // ReAct 模式
-func (engine *AgentEngine) Stream(ctx context.Context, input Input) *EventStream {
+func (engine *AgentEngine) Execute(ctx context.Context, input Input) *EventStream {
 	result := NewEventStream()
 
 	settings := engine.Settings
@@ -71,7 +71,7 @@ func (engine *AgentEngine) Stream(ctx context.Context, input Input) *EventStream
 		// return nil, err
 	}
 	// tools
-	messageTools := engine.RenderTools(settings.Tools)
+	messageTools := engine.RenderTools(settings.Tools...)
 
 	go func() {
 		defer result.Close()
@@ -110,6 +110,7 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 	instance := llm.NewInstance(engine.Settings.LLMModel.Provider)
 	reponse, err := instance.Invoke(ctx, messages,
 		llm.WithTools(tools...),
+		llm.WithStream(engine.Settings.Stream),
 		llm.WithModel(engine.Settings.LLMModel.Name),
 	)
 	if err != nil {
@@ -165,7 +166,7 @@ func (engine *AgentEngine) Invoke(ctx context.Context, input Input) (any, error)
 	}
 
 	// tools
-	messageTools := engine.RenderTools(settings.Tools)
+	messageTools := engine.RenderTools(settings.Tools...)
 
 	finish := false
 	finalAnswer := ""
@@ -206,39 +207,40 @@ func (engine *AgentEngine) Invoke(ctx context.Context, input Input) (any, error)
 }
 
 // "ToolCalls":[{"Id":"call_cr1kufc2c3m560b2ioe0","Type":"function","Function":{"Name":"weather","Arguments":"{\"city\":\"北京三里屯\"}"}}]}}]
-func (engine *AgentEngine) invokeTool(ctx context.Context, tools []ToolSetting, t llm.ToolCall) (string, error) {
+func (engine *AgentEngine) invokeTool(ctx context.Context, tools []string, t llm.ToolCall) (string, error) {
 
-	var ts *ToolSetting
-	for i := 0; i < len(tools); i++ {
-		if tools[i].Name == t.Function.Name {
-			ts = &tools[i]
-			break
-		}
-	}
-	if ts == nil {
-		return "", fmt.Errorf("unknown tool: %v", t)
-	}
-	var toolIns tool.Tool
-	if ts.ProviderKind == "api" {
-		toolIns = tool.NewAPITool(tool.APIToolBundle{
-			ServerURL:  ts.Extensions["serverURL"].(string),
-			Parameters: ts.Parameters,
-			Method:     ts.Extensions["method"].(string),
-			PostCode:   ts.Extensions["postCode"].(string),
-		})
-	} else if ts.ProviderKind == "code" {
-		toolIns = tool.NewCodeTool(t.Function.Name)
-	} else {
-		return "", fmt.Errorf("unknown tool provider: %v", ts.ProviderKind)
-	}
-	if toolIns == nil {
-		return "", fmt.Errorf("unknown tool: %v", t.Function.Name)
-	}
+	// var ts *ToolSetting
+	// for i := 0; i < len(tools); i++ {
+	// 	if tools[i].Name == t.Function.Name {
+	// 		ts = &tools[i]
+	// 		break
+	// 	}
+	// }
+	// if ts == nil {
+	// 	return "", fmt.Errorf("unknown tool: %v", t)
+	// }
+	// var toolIns tool.Tool
+	// if ts.ProviderKind == "api" {
+	// 	toolIns = tool.NewAPITool(tool.APIToolBundle{
+	// 		ServerURL:  ts.Extensions["serverURL"].(string),
+	// 		Parameters: ts.Parameters,
+	// 		Method:     ts.Extensions["method"].(string),
+	// 		PostCode:   ts.Extensions["postCode"].(string),
+	// 	})
+	// } else if ts.ProviderKind == "code" {
+	// 	toolIns = tool.NewCodeTool(t.Function.Name)
+	// } else {
+	// 	return "", fmt.Errorf("unknown tool provider: %v", ts.ProviderKind)
+	// }
+	// if toolIns == nil {
+	// 	return "", fmt.Errorf("unknown tool: %v", t.Function.Name)
+	// }
 
-	var args map[string]any
-	json.Unmarshal([]byte(t.Function.Arguments), &args)
-	result, err := toolIns.Invoke(ctx, args)
-	return result, err
+	// var args map[string]any
+	// json.Unmarshal([]byte(t.Function.Arguments), &args)
+	// result, err := toolIns.Invoke(ctx, args)
+	// return result, err
+	return "", nil
 }
 
 // renderContexts 从知识库中检索相关信息
@@ -268,4 +270,39 @@ func (engine *AgentEngine) renderContexts(ctx context.Context, settings *Setting
 		}
 	}
 	return contexts, nil
+}
+
+// RenderTools ...
+func (engine *AgentEngine) RenderTools(tools ...string) []*llm.Tool {
+	messageTools := make([]*llm.Tool, 0)
+	for _, toolName := range tools {
+		tool := tool.Spawn(toolName)
+		messageTool := &llm.Tool{
+			Type: "function",
+			Function: &llm.FunctionDefinition{
+				Name:        tool.Name,
+				Description: tool.Description,
+				Parameters: map[string]any{
+					"type":       "object",
+					"properties": map[string]any{},
+					"required":   []string{},
+				},
+			},
+		}
+
+		for _, p := range tool.Parameters {
+			properties := messageTool.Function.Parameters["properties"].(map[string]any)
+			properties[p.Name] = map[string]any{
+				"description": p.LLMDescrition,
+				"type":        p.Type,
+				"enum":        nil,
+			}
+			if p.Required {
+				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
+			}
+		}
+
+		messageTools = append(messageTools, messageTool)
+	}
+	return messageTools
 }

@@ -23,7 +23,7 @@ type Input struct {
 // Engine ...
 type Engine interface {
 	Invoke(ctx context.Context, input Input) (any, error)
-	Stream(ctx context.Context, input Input) *EventStream
+	Execute(ctx context.Context, input Input) *EventStream
 }
 
 // BotEngine ...
@@ -142,38 +142,4 @@ func (r *BotEngine) RenderMessages(ctx context.Context, preset string,
 	// query
 	messages = append(messages, llm.UserTextPromptMessage(query))
 	return messages, stops
-}
-
-// RenderTools ...
-func (r *BotEngine) RenderTools(tools []ToolSetting) []*llm.Tool {
-	messageTools := make([]*llm.Tool, 0)
-	for _, tool := range tools {
-		messageTool := &llm.Tool{
-			Type: "function",
-			Function: &llm.FunctionDefinition{
-				Name:        tool.Name,
-				Description: tool.Description,
-				Parameters: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-					"required":   []string{},
-				},
-			},
-		}
-
-		for _, p := range tool.Parameters {
-			properties := messageTool.Function.Parameters["properties"].(map[string]any)
-			properties[p.Name] = map[string]any{
-				"description": p.LLMDescrition,
-				"type":        p.Type,
-				"enum":        nil,
-			}
-			if p.Required {
-				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
-			}
-		}
-
-		messageTools = append(messageTools, messageTool)
-	}
-	return messageTools
 }

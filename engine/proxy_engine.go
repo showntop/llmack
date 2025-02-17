@@ -27,13 +27,8 @@ func (engine *ProxyEngine) Invoke(ctx context.Context, input Input) (any, error)
 	// query := input.Query
 	// 调用 工具
 	answer := ""
-	for _, ts := range engine.Settings.Tools {
-		toolIns := tool.NewAPITool(tool.APIToolBundle{
-			ServerURL:  ts.Extensions["serverURL"].(string),
-			Parameters: ts.Parameters,
-			Method:     ts.Extensions["method"].(string),
-			PostCode:   ts.Extensions["postCode"].(string),
-		})
+	for _, toolName := range engine.Settings.Tools {
+		toolIns := tool.Spawn(toolName)
 		output, err := toolIns.Invoke(ctx, inputs)
 		if err != nil {
 			return nil, err
@@ -44,8 +39,8 @@ func (engine *ProxyEngine) Invoke(ctx context.Context, input Input) (any, error)
 	return answer, nil
 }
 
-// Stream ... return channel， not support streaming
-func (engine *ProxyEngine) Stream(ctx context.Context, input Input) *EventStream {
+// Execute ... return channel， not support streaming
+func (engine *ProxyEngine) Execute(ctx context.Context, input Input) *EventStream {
 	resultChan := NewEventStream()
 
 	inputs := input.Inputs
@@ -54,16 +49,11 @@ func (engine *ProxyEngine) Stream(ctx context.Context, input Input) *EventStream
 		resultChan.Push(ErrorEvent(errors.New("proxy engine only support one tool")))
 		return resultChan
 	}
-	setting := engine.Settings.Tools[0]
+	toolName := engine.Settings.Tools[0]
 	// query := input.Query
-	toolIns := tool.NewAPITool(tool.APIToolBundle{
-		ServerURL:  setting.Extensions["serverURL"].(string),
-		Parameters: setting.Parameters,
-		Method:     setting.Extensions["method"].(string),
-		PostCode:   setting.Extensions["postCode"].(string),
-	})
+	toolIns := tool.Spawn(toolName)
 	go func() {
-		output, err := toolIns.Stream(ctx, inputs)
+		output, err := toolIns.Invoke(ctx, inputs)
 		if err != nil {
 			resultChan.Push(ErrorEvent(err))
 			return

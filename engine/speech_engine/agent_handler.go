@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/showntop/llmack/agent"
 	"github.com/showntop/llmack/llm"
+	"github.com/showntop/llmack/program"
 	"github.com/showntop/llmack/speech"
 )
 
@@ -18,7 +18,7 @@ func agentHandler(r *Turn, next Handler) Handler {
 		var vv speech.AgentPayload
 		json.Unmarshal(payload, &vv)
 		// new simple agent
-		agt := agent.FunAgent{}
+		agt := program.FunAgent{}
 		result := agt.Run(r.Context())
 
 		resultx, ok := result.(*llm.Stream)

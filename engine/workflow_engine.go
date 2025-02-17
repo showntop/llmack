@@ -34,8 +34,8 @@ func (engine *WorkflowEngine) Invoke(ctx context.Context, input Input) (any, err
 	return result, nil
 }
 
-// Stream ... return channel， 不支持streaming
-func (engine *WorkflowEngine) Stream(ctx context.Context, input Input) *EventStream {
+// Execute ... return channel， 不支持streaming
+func (engine *WorkflowEngine) Execute(ctx context.Context, input Input) *EventStream {
 	resultChan := NewEventStream()
 	if input.Inputs == nil {
 		input.Inputs = make(map[string]any)
