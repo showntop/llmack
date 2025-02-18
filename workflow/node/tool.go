@@ -34,12 +34,13 @@ func ToolNode(node *workflow.Node) (*toolNode, error) {
 //
 // Configured results are evaluated with the results from the function and final scope is then returned
 func (n *toolNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, error) {
-	providerKind, _ := n.Node.Metadata["provider_kind"].(string)
+	// providerKind, _ := n.Node.Metadata["provider_kind"].(string)
 	toolName, _ := n.Node.Metadata["tool_name"].(string)
-	providerID, _ := n.Node.Metadata["provider_id"].(float64)
+	// providerID, _ := n.Node.Metadata["provider_id"].(float64)
 	stream, _ := n.Node.Metadata["stream"].(bool)
 
-	if providerKind == "" || toolName == "" {
+	// if providerKind == "" || toolName == "" {
+	if toolName == "" {
 		return nil, fmt.Errorf("provider_kind or tool_name is empty")
 	}
 
@@ -56,9 +57,9 @@ func (n *toolNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, e
 		inputs[input.Name] = value
 	}
 
-	toolRun := tool.Instantiate(int64(providerID), providerKind, toolName)
+	toolRun := tool.Spawn(toolName)
 	if stream {
-		results, err := toolRun.Stream(ctx, inputs)
+		results, err := toolRun.Invoke(ctx, inputs)
 		return map[string]any{"result": results}, err
 	}
 	result, err := toolRun.Invoke(ctx, inputs)

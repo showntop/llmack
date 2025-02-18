@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -50,6 +51,10 @@ func (m PromptMessage) MultipartContent() []*MultipartContent {
 
 func (m PromptMessage) String() string {
 	return "fsf"
+}
+
+func (m PromptMessage) GetToolCalls() []*ToolCall {
+	return nil
 }
 
 // MarshalJSON 实现marshal
@@ -139,11 +144,16 @@ type assistantPromptMessage struct {
 	ReasoningContent string      `json:"reasoning_content"`
 }
 
+func (m assistantPromptMessage) GetToolCalls() []*ToolCall {
+	return m.ToolCalls
+}
+
 func (m *assistantPromptMessage) String() string {
 	if m.ReasoningContent != "" {
 		return fmt.Sprintf("%s: reasoning: %s", m.role, m.ReasoningContent)
 	}
-	return fmt.Sprintf("%s: %s", m.role, m.content)
+	raw, _ := json.Marshal(m.ToolCalls)
+	return fmt.Sprintf("%s => (content:%s, tool_calls: %+v)", m.role, m.content, string(raw))
 }
 
 // toolPromptMessage ...
@@ -161,13 +171,14 @@ func (m toolPromptMessage) ToolID() string {
 type ToolCall struct {
 	ID       string           `json:"id"`
 	Type     string           `json:"type"`
+	Index    int              `json:"index"`
 	Function ToolCallFunction `json:"function"`
 }
 
 // ToolCallFunction ...
 type ToolCallFunction struct {
 	Name      string `json:"name"`
-	Arguments string `json:"args"`
+	Arguments string `json:"arguments"`
 }
 
 // Messages ...
@@ -179,5 +190,6 @@ type Message interface {
 	MultipartContent() []*MultipartContent
 	Role() PromptMessageRole
 	ToolID() string
+	GetToolCalls() []*ToolCall
 	String() string
 }

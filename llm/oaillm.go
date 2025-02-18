@@ -44,9 +44,9 @@ func (o *OAILLM) Invoke(ctx context.Context, messages []Message, optFuncs ...Inv
 	}
 
 	if options.Stream {
-		return o.handleStreamResponse(ctx, body)
+		return o.handleStreamResponse(body)
 	}
-	return o.handleStreamResponse(ctx, body)
+	return o.handleStreamResponse(body)
 }
 
 // ChatCompletions ...
@@ -86,6 +86,7 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 			Role:       string(m.Role()),
 			ToolCallID: m.ToolID(),
 		}
+		msg.ToolCalls = m.GetToolCalls()
 		msg.Content = m.Content()
 		msg.MultipartContent = m.MultipartContent()
 		request.Messages = append(request.Messages, msg)
@@ -93,17 +94,15 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 	if len(options.Tools) <= 0 {
 		return request
 	}
-	request.ToolChoice = "auto"
+	request.ToolChoice = "required"
 	request.Tools = options.Tools
 	return request
 }
 
 // handleStreamResponse ...
-func (o *OAILLM) handleStreamResponse(ctx context.Context, body io.ReadCloser) (*Response, error) {
+func (o *OAILLM) handleStreamResponse(body io.ReadCloser) (*Response, error) {
 	response := NewStreamResponse()
 
-	// var toolCall *llm.ToolCall
-	// toolCalls := []*llm.ToolCall{}
 	process := func() {
 		defer body.Close()
 		defer response.Stream().Close()
@@ -117,8 +116,7 @@ func (o *OAILLM) handleStreamResponse(ctx context.Context, body io.ReadCloser) (
 				}
 				continue
 			}
-
-			chunk, err := BuildChunkMessage(line) // TODO Unmarshal line
+			chunk, err := buildChunkMessage(line) // TODO Unmarshal line
 			if err != nil {
 				continue
 			}

@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 
 	"github.com/showntop/llmack/rag"
-	"github.com/showntop/llmack/tool"
 	"github.com/showntop/llmack/workflow"
 )
 
 // DefaultSettings ...
 func DefaultSettings() *Settings {
 	return &Settings{
-		ChatMode:     BotModeChat,
 		PresetPrompt: "",
 		Preamble:     "",
 		Knowledge:    make([]rag.Options, 0),
@@ -30,7 +28,6 @@ func DefaultSettings() *Settings {
 
 // Settings ...
 type Settings struct {
-	ChatMode     int           `json:"chat_mode"` // 1. 一问一答 2. 多轮问答
 	PresetPrompt string        `json:"preset_prompt"`
 	Preamble     string        `json:"preamble"` // 机器人开场白
 	Knowledge    []rag.Options `json:"knowledge"`
@@ -42,7 +39,7 @@ type Settings struct {
 		MaxIteration int `json:"max_iteration"`
 	}
 	Workflow *workflow.Workflow `json:"workflow"`
-	Tools    []ToolSetting      `json:"tools"`
+	Tools    []string           `json:"tools"`
 	Stream   bool               `json:"stream"`
 }
 
@@ -50,19 +47,4 @@ type Settings struct {
 func (s *Settings) String() string {
 	raw, _ := json.Marshal(s)
 	return string(raw)
-}
-
-// ToolSetting ...
-type ToolSetting struct {
-	ProviderKind string //  builtin api workflow
-	ProviderID   int64  //  builtin api workflow
-
-	Name        string
-	Key         string
-	Description string
-	Parameters  []tool.Parameter
-	Parameters2 string
-
-	// 扩展
-	Extensions map[string]any
 }

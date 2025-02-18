@@ -1,15 +1,5 @@
 package tool
 
-// Meta ...
-type Meta struct {
-	ID          int64  // 引用的工具ID
-	Kind        string // 引用的工具类型
-	Operation   string // 操作名称（唯一）
-	Name        string
-	Description string
-	Parameters  []Parameter
-}
-
 // ParameterType 枚举类型
 type ParameterType string
 
