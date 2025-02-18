@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"log"
 	stdstrs "strings"
 
 	"github.com/showntop/llmack/llm"
@@ -118,14 +119,33 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 		return "", false, err
 	}
 	stream := reponse.Stream()
-	toolCalls := []llm.ToolCall{}
+	toolCalls := []*llm.ToolCall{}
 	response := ""
 	finish := false
+
+	// fill tool calls from chunk
+	findToolCall := func(id string) *llm.ToolCall {
+		if id == "" {
+			return toolCalls[len(toolCalls)-1]
+		}
+		for _, t := range toolCalls {
+			if t.ID == id {
+				return t
+			}
+		}
+		t := &llm.ToolCall{ID: id}
+		toolCalls = append(toolCalls, t)
+		return t
+	}
 	for r := stream.Next(); r != nil; r = stream.Next() {
 		if len(r.Delta.Message.ToolCalls) > 0 { // tool call
 			for i := 0; i < len(r.Delta.Message.ToolCalls); i++ {
-				toolCalls = append(toolCalls, *r.Delta.Message.ToolCalls[i])
+				t := findToolCall(r.Delta.Message.ToolCalls[i].ID)
+				t.Type += r.Delta.Message.ToolCalls[i].Type
+				t.Function.Name += r.Delta.Message.ToolCalls[i].Function.Name
+				t.Function.Arguments += r.Delta.Message.ToolCalls[i].Function.Arguments
 			}
+			continue
 		}
 
 		response += r.Delta.Message.Content()
@@ -133,7 +153,7 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 	}
 
 	if len(toolCalls) > 0 {
-		engine.thoughs = append(engine.thoughs, llm.AssistantPromptMessage(response))
+		engine.thoughs = append(engine.thoughs, llm.AssistantPromptMessage(string(response)).WithToolCalls(toolCalls))
 		for i := 0; i < len(toolCalls); i++ {
 			toolResult, err := engine.invokeTool(ctx, engine.Settings.Tools, toolCalls[i])
 			if err != nil { // 调用工具出错
@@ -156,11 +176,16 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 }
 
 // "ToolCalls":[{"Id":"call_cr1kufc2c3m560b2ioe0","Type":"function","Function":{"Name":"weather","Arguments":"{\"city\":\"北京三里屯\"}"}}]}}]
-func (engine *AgentEngine) invokeTool(ctx context.Context, tools []string, t llm.ToolCall) (string, error) {
+func (engine *AgentEngine) invokeTool(ctx context.Context, tools []string, t *llm.ToolCall) (string, error) {
 	// TODO check function name valid?
 	var args map[string]any
 	json.Unmarshal([]byte(t.Function.Arguments), &args)
-	return tool.Spawn(t.Function.Name).Invoke(ctx, args)
+	result, err := tool.Spawn(t.Function.Name).Invoke(ctx, args)
+	log.Printf("AgentEngine invokeTool: %s, %s response: %s error: %v \n", t.Function.Name, t.Function.Arguments, result, err)
+	if err != nil {
+		return "", err
+	}
+	return result, nil
 }
 
 // renderContexts 从知识库中检索相关信息

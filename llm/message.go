@@ -53,6 +53,10 @@ func (m PromptMessage) String() string {
 	return "fsf"
 }
 
+func (m PromptMessage) GetToolCalls() []*ToolCall {
+	return nil
+}
+
 // MarshalJSON 实现marshal
 func (m PromptMessage) MarshalJSON() ([]byte, error) {
 	if m.content != "" {
@@ -140,6 +144,10 @@ type assistantPromptMessage struct {
 	ReasoningContent string      `json:"reasoning_content"`
 }
 
+func (m assistantPromptMessage) GetToolCalls() []*ToolCall {
+	return m.ToolCalls
+}
+
 func (m *assistantPromptMessage) String() string {
 	if m.ReasoningContent != "" {
 		return fmt.Sprintf("%s: reasoning: %s", m.role, m.ReasoningContent)
@@ -163,13 +171,14 @@ func (m toolPromptMessage) ToolID() string {
 type ToolCall struct {
 	ID       string           `json:"id"`
 	Type     string           `json:"type"`
+	Index    int              `json:"index"`
 	Function ToolCallFunction `json:"function"`
 }
 
 // ToolCallFunction ...
 type ToolCallFunction struct {
 	Name      string `json:"name"`
-	Arguments string `json:"args"`
+	Arguments string `json:"arguments"`
 }
 
 // Messages ...
@@ -181,5 +190,6 @@ type Message interface {
 	MultipartContent() []*MultipartContent
 	Role() PromptMessageRole
 	ToolID() string
+	GetToolCalls() []*ToolCall
 	String() string
 }
