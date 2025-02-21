@@ -3,10 +3,8 @@ package node
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/expr-lang/expr"
-	"github.com/showntop/flatmap"
 
 	"github.com/showntop/llmack/workflow"
 	wf "github.com/showntop/llmack/workflow"
@@ -29,18 +27,7 @@ func ExprNode(n *workflow.Node) *exprNode {
 
 // Execute 执行JSON节点，单次执行
 func (n *exprNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, error) {
-	env, err := flatmap.Flatten(r.Scope, flatmap.DefaultTokenizer)
-	if err != nil {
-		return nil, errors.Join(err)
-	}
 
-	inputs := make(map[string]any)
-	for _, input := range n.Node.Inputs {
-		pointer := strings.TrimPrefix(input.Value, "{{")
-		pointer = strings.TrimSuffix(pointer, "}}")
-		value := env.Get(pointer)
-		inputs[input.Name] = value
-	}
 	// inputs["input"] = `{"a": 1}`
 
 	expression, _ := n.Node.Metadata["expr"].(string)
@@ -48,11 +35,11 @@ func (n *exprNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, e
 		return nil, nil
 	}
 
-	program, err := expr.Compile(expression, expr.Env(inputs))
+	program, err := expr.Compile(expression, expr.Env(r.Inputs))
 	if err != nil {
 		return nil, errors.Join(err)
 	}
-	result, err := expr.Run(program, inputs)
+	result, err := expr.Run(program, r.Inputs)
 	if err != nil {
 		return nil, errors.Join(err)
 	}

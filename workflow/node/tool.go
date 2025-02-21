@@ -34,9 +34,7 @@ func ToolNode(node *workflow.Node) (*toolNode, error) {
 //
 // Configured results are evaluated with the results from the function and final scope is then returned
 func (n *toolNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, error) {
-	// providerKind, _ := n.Node.Metadata["provider_kind"].(string)
 	toolName, _ := n.Node.Metadata["tool_name"].(string)
-	// providerID, _ := n.Node.Metadata["provider_id"].(float64)
 	stream, _ := n.Node.Metadata["stream"].(bool)
 
 	// if providerKind == "" || toolName == "" {

@@ -153,7 +153,7 @@ func (m *assistantPromptMessage) String() string {
 		return fmt.Sprintf("%s: reasoning: %s", m.role, m.ReasoningContent)
 	}
 	raw, _ := json.Marshal(m.ToolCalls)
-	return fmt.Sprintf("%s => (content:%s, tool_calls: %+v)", m.role, m.content, string(raw))
+	return fmt.Sprintf("%s => (content:%s tool_calls: %+v)", m.role, m.content, string(raw))
 }
 
 // toolPromptMessage ...

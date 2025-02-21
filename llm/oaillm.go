@@ -114,7 +114,7 @@ func (o *OAILLM) handleStreamResponse(body io.ReadCloser) (*Response, error) {
 				if err == io.EOF {
 					break
 				}
-				continue
+				break
 			}
 			chunk, err := buildChunkMessage(line) // TODO Unmarshal line
 			if err != nil {

@@ -12,6 +12,8 @@ func Build(n *workflow.Node, outgoing ...workflow.Edge) (Node, error) {
 	switch n.Kind {
 	case workflow.NodeKindStart:
 		return StartNode(n), nil
+	case workflow.NodeKindLLM:
+		return LLMNode(n), nil
 	case workflow.NodeKindGateway:
 		switch n.Subref {
 		case "exclusive":
