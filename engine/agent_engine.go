@@ -141,7 +141,7 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 		if len(r.Delta.Message.ToolCalls) > 0 { // tool call
 			for i := 0; i < len(r.Delta.Message.ToolCalls); i++ {
 				t := findToolCall(r.Delta.Message.ToolCalls[i].ID)
-				t.Type += r.Delta.Message.ToolCalls[i].Type
+				t.Type = r.Delta.Message.ToolCalls[i].Type
 				t.Function.Name += r.Delta.Message.ToolCalls[i].Function.Name
 				t.Function.Arguments += r.Delta.Message.ToolCalls[i].Function.Arguments
 			}
