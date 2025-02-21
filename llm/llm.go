@@ -198,7 +198,6 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 				}
 			}
 			firstChunk = false
-
 			newResp.stream.Push(chunk)
 			if chunk.Delta.Message.ReasoningContent != "" {
 				result += chunk.Delta.Message.ReasoningContent

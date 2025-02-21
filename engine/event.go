@@ -82,7 +82,7 @@ func EndEventWithSource(data any, source, sourceID string) *Event {
 }
 
 // WorkflowEvent ...
-func WorkflowEvent(data *workflow.Event) *Event {
+func WorkflowEvent(data any) *Event {
 	return &Event{
 		Name: EventToast,
 		Data: data,

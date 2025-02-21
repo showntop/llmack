@@ -9,32 +9,40 @@ import (
 
 	"github.com/showntop/llmack/engine"
 	"github.com/showntop/llmack/llm"
-	"github.com/showntop/llmack/llm/qwen"
+	"github.com/showntop/llmack/llm/deepseek"
 	"github.com/showntop/llmack/log"
+	"github.com/showntop/llmack/tool"
 
 	"github.com/showntop/llmack/tool/datetime"
-	"github.com/showntop/llmack/tool/weather"
+	"github.com/showntop/llmack/tool/search"
 )
 
 func init() {
 	godotenv.Load()
 	llm.WithSingleConfig(map[string]any{
-		// "api_key":  os.Getenv("deepseek_api_key2"),
-		// "base_url": "https://api.lkeap.cloud.tencent.com/v1",
-		"api_key": os.Getenv("qwen_api_key"),
+		"api_key":  os.Getenv("deepseek_api_key2"),
+		"base_url": "https://api.lkeap.cloud.tencent.com/v1",
+		// "api_key": os.Getenv("qwen_api_key"),
+	})
+
+	tool.WithConfig(map[string]any{
+		"serper": map[string]any{
+			"api_key": os.Getenv("serper_api_key"),
+		},
 	})
 }
 
 func main() {
 	settings := engine.DefaultSettings()
-	settings.PresetPrompt = "你是一个AI助手"
-	// settings.LLMModel.Provider = deepseek.Name
-	settings.LLMModel.Provider = qwen.Name
-	settings.LLMModel.Name = "qwen-plus"
-	settings.Tools = append(settings.Tools, datetime.GetDate, weather.QueryWeather)
+	settings.PresetPrompt = "你是一个AI写作助手，使用网络信息写文章"
+	settings.LLMModel.Provider = deepseek.Name
+	// settings.LLMModel.Provider = qwen.Name
+	// settings.LLMModel.Name = "qwen-plus"
+	settings.LLMModel.Name = "deepseek-v3"
+	settings.Tools = append(settings.Tools, datetime.GetDate, search.Serper)
 	eng := engine.NewAgentEngine(settings, engine.WithLogger(&log.WrapLogger{}))
 	esm := eng.Execute(context.Background(), engine.Input{
-		Query: "我明天要去北京旅游，根据日期，看一下天气，规划一下旅程。",
+		Query: `主题：科技能改变世界吗？`,
 	})
 	for evt := esm.Next(); evt != nil; evt = esm.Next() {
 		if evt.Error != nil {

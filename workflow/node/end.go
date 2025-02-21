@@ -6,6 +6,7 @@ import (
 
 	"github.com/showntop/flatmap"
 
+	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/workflow"
 	wf "github.com/showntop/llmack/workflow"
@@ -40,31 +41,30 @@ func (nd endNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, er
 	result := make(map[string]any)
 
 	// 处理输出
-	log.InfoContextf(ctx, "end node %+v inputs: %+v", nd.Node.Metadata, r.Scope)
+	log.InfoContextf(ctx, "end node %+v inputs: %+v", nd.Node.Metadata, r.Inputs)
 	//	extract args
-	mp, err := flatmap.Flatten(r.Scope, flatmap.DefaultTokenizer)
+	mp, err := flatmap.Flatten(r.Inputs, flatmap.DefaultTokenizer)
 	if err != nil {
 		return result, err
 	}
 	log.InfoContextf(ctx, "end node %+v inputs: %+v", nd.Node.Metadata, mp)
-	for _, p := range nd.Node.Outputs {
+
+	for name, p := range nd.Node.Outputs {
 		pointer := strings.TrimPrefix(p.Value, "{{")
 		pointer = strings.TrimSuffix(pointer, "}}")
 		value := mp.Get(pointer)
-		values, ok := value.(<-chan interface{})
-		if !ok {
-			values, ok = value.(chan interface{})
-		}
-		if ok { // TODO 并行
-			for v := range values {
-				r.Events <- &workflow.Event{
-					Type: "TODO",
-					Data: v,
+		if response, ok := value.(*llm.Response); ok {
+			go func() {
+				stream := response.Stream()
+				for chunk := stream.Next(); chunk != nil; chunk = stream.Next() {
+					r.Events <- &workflow.Event{
+						Data: chunk,
+					}
 				}
-			}
+				close(r.Events)
+			}()
 		}
-		result[p.Name] = value
+		result[name] = value
 	}
-
 	return result, nil
 }

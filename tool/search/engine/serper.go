@@ -1,4 +1,4 @@
-package serper
+package engine
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/showntop/llmack/log"
-	"github.com/showntop/llmack/tool/search"
 )
 
 type options struct {
@@ -37,7 +36,7 @@ func WithKey(k string) Option {
 }
 
 // NewSerper 创建serper
-func NewSerper(optxs ...Option) search.Searcher {
+func NewSerper(optxs ...Option) Searcher {
 	opts := &options{}
 	for i := 0; i < len(optxs); i++ {
 		optxs[i](opts)
@@ -45,7 +44,7 @@ func NewSerper(optxs ...Option) search.Searcher {
 	if opts.kind == "" {
 		opts.kind = "search"
 	}
-	return &Serper{apiKey: os.Getenv("serper_api_key"), kind: opts.kind, options: opts}
+	return &Serper{apiKey: opts.key, kind: opts.kind, options: opts}
 }
 
 // Serper 使用serper搜索
@@ -61,7 +60,7 @@ func (s *Serper) Category() string {
 }
 
 // Search 使用serper搜索
-func (s *Serper) Search(ctx context.Context, query string) ([]*search.Result, error) {
+func (s *Serper) Search(ctx context.Context, query string) ([]*Result, error) {
 
 	url := "https://google.serper.dev/" + s.kind
 	method := "POST"
@@ -92,11 +91,10 @@ func (s *Serper) Search(ctx context.Context, query string) ([]*search.Result, er
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("resultresultresultresultresultresult: %+v \n", result)
-	xxx := make([]*search.Result, 0, result.SearchParameters.Num)
+	xxx := make([]*Result, 0, result.SearchParameters.Num)
 	if result.SearchParameters.Type == "images" {
 		for _, v := range result.Images {
-			xxx = append(xxx, &search.Result{
+			xxx = append(xxx, &Result{
 				Link:  v.Link,
 				Image: v.ImageURL,
 				Video: "",
@@ -105,7 +103,7 @@ func (s *Serper) Search(ctx context.Context, query string) ([]*search.Result, er
 		}
 	} else if result.SearchParameters.Type == "videos" {
 		for _, v := range result.Videos {
-			xxx = append(xxx, &search.Result{
+			xxx = append(xxx, &Result{
 				Link:  v.Link,
 				Video: extractYouTubeID(v.Link),
 				Title: v.Title,
@@ -113,7 +111,7 @@ func (s *Serper) Search(ctx context.Context, query string) ([]*search.Result, er
 		}
 	} else {
 		for _, v := range result.Organic {
-			xxx = append(xxx, &search.Result{
+			xxx = append(xxx, &Result{
 				Time:    v.Time,
 				Link:    v.Link,
 				Image:   "",
