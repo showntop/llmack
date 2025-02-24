@@ -4,22 +4,18 @@ import (
 	"context"
 	"net/http"
 	"sync"
-	"time"
 
 	html2md "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
+	"github.com/showntop/llmack/log"
 )
 
 // CrawlWebpage 并发抓取网页内容
 func CrawlWebpage(ctx context.Context, urls []string) ([]string, error) {
 
 	var wg sync.WaitGroup
-	results := make([]string, 0)
 	resultsChan := make(chan string, len(urls))
-
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
 
 	for _, urlx := range urls {
 		wg.Add(1)
@@ -42,19 +38,13 @@ func CrawlWebpage(ctx context.Context, urls []string) ([]string, error) {
 	}
 
 	// 等待所有任务完成或超时
-	done := make(chan struct{})
 	go func() {
 		wg.Wait()
-		close(done)
+		close(resultsChan)
 	}()
 
-	select {
-	case <-done:
-		close(resultsChan)
-	case <-time.After(time.Second): // 1秒超时
-		cancel()
-	}
 	// 收集结果
+	results := make([]string, 0)
 	for result := range resultsChan {
 		results = append(results, result)
 	}
@@ -63,8 +53,9 @@ func CrawlWebpage(ctx context.Context, urls []string) ([]string, error) {
 }
 
 func crawlURL(ctx context.Context, url string) (string, error) {
+	log.InfoContextf(ctx, "serper crawl detail about %s", url)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	res, err := http.DefaultClient.Do(req)
+	res, err := http.DefaultClient.Do(req) // TODO timeout configure
 	if err != nil {
 		return "", err
 	}
@@ -77,13 +68,20 @@ func crawlURL(ctx context.Context, url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	doc.Find("img").Each(func(i int, s *goquery.Selection) {
-		s.Remove()
-	})
+	// fmt.Println(doc.Html())
+	// ttt := doc.Find("a").Remove().End().Text()
+	// fmt.Println(ttt)
+	// panic("test")
+
+	// doc.Find("img").Each(func(i int, s *goquery.Selection) {
+	// 	s.Remove()
+	// })
 	html, _ := doc.Find("body").Html()
 	// Find the review items
 	content, err := html2md.ConvertString(html)
 	// fmt.Println(content)
+	// panic("test")
+	// 提前
 	return content, err
 }
 

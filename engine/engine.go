@@ -22,7 +22,6 @@ type Input struct {
 
 // Engine ...
 type Engine interface {
-	Invoke(ctx context.Context, input Input) (any, error)
 	Execute(ctx context.Context, input Input) *EventStream
 }
 
@@ -67,16 +66,6 @@ func (r *BotEngine) AfterLLMFinish(ctx context.Context, err error) {
 	for _, h := range r.Hooks {
 		h.AfterLLMFinish(ctx, err)
 	}
-}
-
-// Invoke ...
-func (r *BotEngine) Invoke(ctx context.Context, input Input) (any, error) {
-	return nil, nil
-}
-
-// Stream ... return channel
-func (r *BotEngine) Stream(ctx context.Context, input Input) <-chan Event {
-	return nil
 }
 
 // NewBotEngine ...

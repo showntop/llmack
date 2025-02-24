@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/expr-lang/expr"
 	"github.com/showntop/flatmap"
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
@@ -56,7 +57,8 @@ func (e *Executor) Execute(ctx context.Context, inputs map[string]any) (*workflo
 		errGroup := errgroup.Group{}
 		for _, node := range currents {
 			errGroup.Go(func() error {
-				nexts, err = e.executeNode(ctx, node)
+
+				nexts, err = e.executeNode(ctx, node, graph.edges[node.ID]...)
 				if err != nil {
 					log.ErrorContextf(ctx, "workflow execute node(id: %s, kind:%s) error, %v", node.ID, node.Kind, err)
 					return nil
@@ -93,13 +95,13 @@ func (e *Executor) Execute(ctx context.Context, inputs map[string]any) (*workflo
 }
 
 // executeNode 执行单个节点
-func (e *Executor) executeNode(ctx context.Context, node *workflow.Node) ([]*workflow.Node, error) {
+func (e *Executor) executeNode(ctx context.Context, node *workflow.Node, outgoings ...*workflow.Edge) ([]*workflow.Node, error) {
 	// 检查节点的所有前置依赖是否已完成
 	// if !graph.AreAllDependenciesCompleted(node.ID) {
 	// 	return nil, nil
 	// }
 
-	nodeIns, err := nodePkg.Build(node)
+	nodeIns, err := nodePkg.Build(node, outgoings...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build node %s: %w", node.ID, err)
 	}
@@ -110,11 +112,17 @@ func (e *Executor) executeNode(ctx context.Context, node *workflow.Node) ([]*wor
 			return nil, errors.Join(err)
 		}
 
-		for _, input := range node.Inputs {
+		for name, input := range node.Inputs {
+			if !strings.HasPrefix(input.Value, "{{") { // expression
+				program, _ := expr.Compile(input.Value)
+				value, _ := expr.Run(program, nil)
+				inputs[name] = value
+				continue
+			}
 			pointer := strings.TrimPrefix(input.Value, "{{")
 			pointer = strings.TrimSuffix(pointer, "}}")
 			value := env.Get(pointer)
-			inputs[input.Name] = value
+			inputs[name] = value
 		}
 	} else {
 		inputs = e.scope
@@ -138,11 +146,15 @@ func (e *Executor) executeNode(ctx context.Context, node *workflow.Node) ([]*wor
 	switch result := result.(type) {
 	case map[string]any:
 		e.scope[node.ID] = result // 更新节点结果
-		// e.outputs = result        // 重置outputs，TODO 注意并行下的bug，需要改得更优雅一些
+		e.outputs = result        // 重置outputs，TODO 注意并行下的bug，需要改得更优雅一些
 	case *llm.Response:
 		e.scope[node.ID] = map[string]any{"response": result}
 		// e.outputs = result
-		nexts = e.graph.NextNodes(node.ID)
+	case *llm.Result:
+		e.scope[node.ID] = map[string]any{"response": result}
+		// e.outputs = result
+	case workflow.NodeID:
+		nexts = []*workflow.Node{e.graph.nodes[result.ID]}
 	case error:
 		return nil, result
 	}

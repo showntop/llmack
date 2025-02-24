@@ -32,7 +32,11 @@ func WithRepo(repo Repo) {
 
 // Spawn ...
 func Spawn(name string) *Tool {
-	return defaultFactory.Spawn(name)
+	x := defaultFactory.Spawn(name)
+	if x == nil {
+		return NilTool
+	}
+	return x
 }
 
 // Tools 工具注册表

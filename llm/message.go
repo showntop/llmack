@@ -50,7 +50,7 @@ func (m PromptMessage) MultipartContent() []*MultipartContent {
 }
 
 func (m PromptMessage) String() string {
-	return "fsf"
+	panic("implement it for string")
 }
 
 func (m PromptMessage) GetToolCalls() []*ToolCall {
@@ -59,9 +59,13 @@ func (m PromptMessage) GetToolCalls() []*ToolCall {
 
 // MarshalJSON 实现marshal
 func (m PromptMessage) MarshalJSON() ([]byte, error) {
-	if m.content != "" {
-		return []byte(fmt.Sprintf(`{"role":"%s","content":"%s"}`, m.role, m.content)), nil
+	if m.role == PromptMessageRoleAssistant {
+		var xxx = map[string]any{"role": m.role, "content": m.content, "name": m.Name}
+		return json.Marshal(xxx)
+	} else if m.role == PromptMessageRoleUser {
+		panic(fmt.Sprintf("user prompt message should not be marshal to json: %v", m))
 	}
+
 	panic("implement it")
 	return nil, nil
 }

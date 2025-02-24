@@ -53,30 +53,8 @@ func (v *Vision) GenerateImage(ctx context.Context, prompt string, optFuncs ...v
 	var result Result
 	json.Unmarshal(body, &result)
 
-	//  response = requests.post(url, json=payload, headers=headers)
-	// 	if response.status_code != 200:
-	// 	return self.create_text_message(f"Got Error Response:{response.text}")
-
-	// res = response.json()
-	// result = [self.create_json_message(res)]
-	// fmt.Println(string(raw))
 	return result.Images[0].Url, nil
 }
-
-// {
-// 	"images": [{
-// 		"url": "https://sc-maas.oss-cn-shanghai.aliyuncs.com/outputs/ea3be4bf-ae06-48cd-b2ed-c9ccc87eb0e1_0.png?OSSAccessKeyId=LTAI5tQnPSzwAnR8NmMzoQq4\u0026Expires=1740135498\u0026Signature=wYHirqBZVw5PiKT1TgOVOLUuvvk%3D"
-// 	}],
-// 	"timings": {
-// 		"inference": 2.519
-// 	},
-// 	"seed": 4999999999,
-// 	"shared_id": "0",
-// 	"data": [{
-// 		"url": "https://sc-maas.oss-cn-shanghai.aliyuncs.com/outputs/ea3be4bf-ae06-48cd-b2ed-c9ccc87eb0e1_0.png?OSSAccessKeyId=LTAI5tQnPSzwAnR8NmMzoQq4\u0026Expires=1740135498\u0026Signature=wYHirqBZVw5PiKT1TgOVOLUuvvk%3D"
-// 	}],
-// 	"created": 1740131898
-// }
 
 type Result struct {
 	Images []struct {
