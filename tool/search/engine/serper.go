@@ -65,7 +65,7 @@ func (s *Serper) Search(ctx context.Context, query string) ([]*Result, error) {
 	url := "https://google.serper.dev/" + s.kind
 	method := "POST"
 
-	payload := strings.NewReader(fmt.Sprintf(`{"q":"%s"}`, query))
+	payload := strings.NewReader(fmt.Sprintf(`{"q":"%s -youtube","gl":"cn"}`, query))
 
 	req, err := http.NewRequest(method, url, payload)
 

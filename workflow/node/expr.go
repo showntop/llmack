@@ -28,14 +28,12 @@ func ExprNode(n *workflow.Node) *exprNode {
 // Execute 执行JSON节点，单次执行
 func (n *exprNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, error) {
 
-	// inputs["input"] = `{"a": 1}`
-
 	expression, _ := n.Node.Metadata["expr"].(string)
 	if expression == "" {
 		return nil, nil
 	}
 
-	program, err := expr.Compile(expression, expr.Env(r.Inputs))
+	program, err := expr.Compile(expression)
 	if err != nil {
 		return nil, errors.Join(err)
 	}
@@ -44,13 +42,5 @@ func (n *exprNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, e
 		return nil, errors.Join(err)
 	}
 
-	// outputs := make(map[string]any)
-	// for _, output := range n.Node.Outputs {
-	// 	pointer := strings.TrimPrefix(output.Value, "{{")
-	// 	pointer = strings.TrimSuffix(pointer, "}}")
-	// 	value := env.Get(pointer)
-	// 	outputs[output.Name] = value
-	// }
-
-	return map[string]any{"result": result}, nil
+	return result, nil
 }

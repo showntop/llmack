@@ -37,7 +37,7 @@ func (engine *WorkflowEngine) Execute(ctx context.Context, input Input) *EventSt
 		defer resultChan.Close()
 
 		for s := range excutor.Events() {
-			resultChan.Push(WorkflowEvent(s.Data))
+			resultChan.Push(WorkflowEvent(s))
 		}
 		resultChan.Push(WorkflowResultEvent(result))
 	}()

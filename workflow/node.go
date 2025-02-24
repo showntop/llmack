@@ -57,3 +57,7 @@ type Node struct {
 	// its free now, need tobe constraint in the future
 	Metadata map[string]any `json:"metadata"`
 }
+
+type NodeID struct {
+	ID string
+}

@@ -7,7 +7,7 @@ import (
 )
 
 // Build 根据节点类型构建节点
-func Build(n *workflow.Node, outgoing ...workflow.Edge) (Node, error) {
+func Build(n *workflow.Node, outgoing ...*workflow.Edge) (Node, error) {
 
 	switch n.Kind {
 	case workflow.NodeKindStart:
