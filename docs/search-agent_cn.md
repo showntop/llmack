@@ -31,19 +31,21 @@ graph TD
 
 ## 核心模块
 
-### 1. 意图识别引擎
+### 1. 意图识别引擎 ([define.go#L10](example/search-agent/workflow/define.go#L10))
+
 - 使用千问Plus模型进行意图分类
 - 支持三种决策类型：
-  ```go
-  type Decision string
-  const (
-      Direct  Decision = "direct"
-      Access           = "access" 
-      Search           = "search"
-  )
-  ```
 
-### 2. 工作流引擎
+```go
+var intentNode = workflow.Node{
+    Metadata: map[string]any{
+        "user_prompt": `意图判断逻辑...`
+    }
+}
+```
+
+### 2. 工作流引擎 ([define.go#L52](example/search-agent/workflow/define.go#L52))
+
 ```go
 func BuildWorkflow() *workflow.Workflow {
     // 构建包含三个分支的工作流
@@ -62,6 +64,19 @@ func BuildWorkflow() *workflow.Workflow {
    - 调用Serper API进行网络搜索
    - 结果经过LLM加工处理
    - 自动生成相关问题
+
+## 代码结构
+
+[代码库](https://github.com/showntop/llmack/tree/main/example/search-agent)
+
+```bash
+example/search-agent/
+├── main.go            # 服务入口与配置
+├── workflow/
+│   └── define.go      # 工作流定义 
+└── inter/
+    └── sse_handler.go # SSE接口实现
+```
 
 ## API接口
 `POST /api/search`
