@@ -13,3 +13,9 @@ type Result struct {
 type Crawler interface {
 	Crawl(ctx context.Context, url string) (*Result, error)
 }
+
+var Crawlers = make(map[string]Crawler)
+
+func Register(name string, c Crawler) {
+	Crawlers[name] = c
+}

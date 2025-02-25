@@ -38,7 +38,13 @@ func (app *Application) Search(ctx context.Context, command SearchCommand) (Sear
 			if evt.Source == "related" {
 				events.Push(&SearchEvent{Status: "related", Related: evt.Data.(*llm.Chunk).Delta.Message.Content()})
 			} else if evt.Source == "answer" {
-				events.Push(&SearchEvent{Status: "answer", Answer: evt.Data.(*llm.Chunk).Delta.Message.Content()})
+				value := ""
+				if x, ok := evt.Data.(*llm.Chunk); ok {
+					value = x.Delta.Message.Content()
+				} else if x, ok := evt.Data.(string); ok {
+					value = x
+				}
+				events.Push(&SearchEvent{Status: "answer", Answer: value})
 			} else if evt.Source == "sources" {
 				events.Push(&SearchEvent{Status: "sources", Sources: evt.Data})
 			} else if evt.Source == "images" {
