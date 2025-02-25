@@ -8,6 +8,10 @@ import (
 	"github.com/showntop/llmack/log"
 )
 
+func init() {
+	Register(Jina, NewCollyCrawler())
+}
+
 // CollyCrawler 使用jina搜索
 type CollyCrawler struct {
 }

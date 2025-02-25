@@ -68,6 +68,11 @@ func (nd endNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, er
 				wg.Done()
 			}()
 		} else {
+			r.Events <- &workflow.Event{
+				Name: name,
+				Data: value,
+				Type: "end",
+			}
 			wg.Done()
 		}
 		result[name] = value

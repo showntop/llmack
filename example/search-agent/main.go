@@ -83,26 +83,19 @@ func cmd() {
 	settings.Workflow = workflow.BuildWorkflow()
 	eng := engine.NewWorkflowEngine(settings, engine.WithLogger(&log.WrapLogger{}))
 	esm := eng.Execute(context.Background(), engine.Input{
-		Query: "如何使用 AI 制作绘本",
-		// Query: "你是谁？",
+		// Query: "如何使用 AI 制作绘本",
+		Query: "你是谁？",
 	})
 	for evt := esm.Next(); evt != nil; evt = esm.Next() {
 		if evt.Error != nil {
 			panic(evt.Error)
 		}
-		// fmt.Printf("main event name:%v data: %+v", evt.Source, evt.Data)
 		if evt.Source == "answer" { //  llm result
 			if cv, ok := evt.Data.(*llm.Chunk); ok {
-				_ = cv
 				fmt.Print(cv.Delta.Message.Content())
+			} else if cv, ok := evt.Data.(string); ok {
+				fmt.Print(cv)
 			}
 		}
-
-		// if cv, ok := evt.Data.(*llm.Chunk); ok {
-		// 	_ = cv
-		// 	fmt.Println("main chunk:", cv.Delta.Message)
-		// } else {
-		// 	// fmt.Println("main event name:", evt.Name, ", data:", evt.Data)
-		// }
 	}
 }

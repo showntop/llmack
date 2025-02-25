@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"github.com/showntop/llmack/llm/qwen"
+	"github.com/showntop/llmack/tool/crawl"
 	"github.com/showntop/llmack/tool/search"
 	"github.com/showntop/llmack/workflow"
 )
@@ -52,13 +53,13 @@ func BuildWorkflow() *workflow.Workflow {
 	wf := workflow.NewWorkflow(1, "search-agent").Link(
 		workflow.Node{ID: "start", Kind: workflow.NodeKindStart},
 		intentNode, // 输出 intent.decision, intent.answer
-		workflow.Node{ID: "llmResult", Kind: workflow.NodeKindExpr, Metadata: map[string]any{
+		workflow.Node{ID: "intentResult", Kind: workflow.NodeKindExpr, Metadata: map[string]any{
 			"expr": "fromJSON(intent.message.content)",
 		}},
 		workflow.Node{ID: "gateway", Kind: workflow.NodeKindGateway, Subref: "exclusive",
 			Inputs: workflow.Parameters{
-				"decision": workflow.Parameter{Value: "{{llmResult.decision}}"},
-				"query":    workflow.Parameter{Value: "{{llmResult.answer}}"},
+				"decision": workflow.Parameter{Value: "{{intentResult.decision}}"},
+				"query":    workflow.Parameter{Value: "{{intentResult.answer}}"},
 			},
 		},
 	)
@@ -66,16 +67,32 @@ func BuildWorkflow() *workflow.Workflow {
 	// 1. branch 1 for direct answer
 	wf.LinkWithCondition("gateway", `decision=="direct"`, workflow.Node{ID: "end", Kind: workflow.NodeKindEnd,
 		Outputs: workflow.Parameters{
-			"answer": workflow.Parameter{Value: "{{llmResult.answer}}"},
+			"answer": workflow.Parameter{Value: "{{intentResult.answer}}"},
 		},
 	})
 
 	// 2. branch 2 for access website
-	wf.LinkWithCondition("gateway", `decision=="access"`, workflow.Node{ID: "end2", Kind: workflow.NodeKindEnd,
-		Outputs: workflow.Parameters{
-			"query": workflow.Parameter{Value: "{{llmResult.answer}}"},
+	wf.LinkWithCondition("gateway", `decision=="access"`,
+		workflow.Node{ID: "crawlWebPage", Kind: workflow.NodeKindTool,
+			Inputs: workflow.Parameters{
+				"link": workflow.Parameter{Value: "{{intentResult.answer}}"},
+			},
+			Metadata: map[string]any{
+				"tool_name": crawl.Jina,
+			},
 		},
-	})
+		workflow.Node{ID: "summarizeResult", Kind: workflow.NodeKindLLM,
+			Metadata: map[string]any{
+				"provider":    qwen.Name,
+				"model":       "qwen-plus",
+				"user_prompt": `总结以下内容: '''{{crawlWebPage.result}}'''`,
+			},
+		},
+		workflow.Node{ID: "end2", Kind: workflow.NodeKindEnd,
+			Outputs: workflow.Parameters{
+				"answer": workflow.Parameter{Value: "{{summarizeResult.response}}"},
+			},
+		})
 
 	// 3. branch 3 for hybrid search and summarize use llm
 	wf.LinkWithCondition("gateway", `decision=="search"`,
@@ -83,7 +100,7 @@ func BuildWorkflow() *workflow.Workflow {
 			ID:   "searchFromEngine",
 			Kind: workflow.NodeKindTool,
 			Inputs: workflow.Parameters{
-				"query": workflow.Parameter{Value: "{{llmResult.answer}}"},
+				"query": workflow.Parameter{Value: "{{intentResult.answer}}"},
 			},
 			Metadata: map[string]any{
 				"tool_name": search.Serper,
