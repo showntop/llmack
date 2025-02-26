@@ -4,7 +4,6 @@ import "context"
 
 // Searcher 搜索器
 type Searcher interface {
-	Category() string
 	Search(ctx context.Context, query string) ([]*Result, error)
 }
 

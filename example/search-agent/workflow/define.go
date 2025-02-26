@@ -13,8 +13,8 @@ var intentNode = workflow.Node{ID: "intent", Kind: workflow.NodeKindLLM, // a sm
 		"provider": qwen.Name,
 		"model":    "qwen-plus",
 		"user_prompt": `
-
 你是一个人工智能搜索系统中的意图判定引擎
+
 #任务
 根据用户query，输出下一步要做什么，你的判断逻辑如下：
 	用户query为：{{query}}

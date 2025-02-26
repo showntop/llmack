@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	stdstrs "strings"
 
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/pkg/strings"
+	"github.com/showntop/llmack/prompt"
 	"github.com/showntop/llmack/rag"
 	"github.com/showntop/llmack/tool"
 )
@@ -31,37 +31,8 @@ func NewAgentEngine(settings *Settings, opts ...Option) Engine {
 	return r
 }
 
-// RenderPromptMessages ...
-func (engine *AgentEngine) RenderPromptMessages(ctx context.Context, preset string,
-	inputs map[string]any, query string, contexts string) ([]llm.Message, []string) {
-	messages := []llm.Message{}
-
-	systemPrompt := `Use the following context as your learned knowledge, inside <context></context> XML tags.\n\n<context>\n{{contexts}}\n</context>\n\nWhen answer to user:\n- If you don't know, just say that you don't know.\n- If you don't know when you are not sure, ask for clarification.\nAvoid mentioning that you obtained the information from the context.\nAnd answer according to the language of the user's question.`
-	systemPrompt = stdstrs.ReplaceAll(systemPrompt, "{{contexts}}", contexts)
-	systemPrompt += preset
-	messages = append(messages, llm.SystemPromptMessage(systemPrompt))
-	// messages = append(messages, llm.UserPromptMessage(preset)) // user preset prompt format inputs
-
-	// formatter := prompt.SimplePromptFormatter{}
-	// messages, _ := formatter.Format(preset, inputs, query, contexts)
-
-	// if preset != "" {
-	// 	messages = append(messages, llm.SystemPromptMessage(preset))
-	// }
-	// if memory from history
-	if engine.opts.Memory != nil {
-		histories := engine.FetchHistoryMessages(ctx)
-		messages = append(messages, histories...)
-	}
-
-	messages = append(messages, llm.UserTextPromptMessage(query)) // 本次 query
-
-	messages = append(messages, engine.thoughs...)
-	return messages, nil
-}
-
 // Execute ... return channel
-// ReAct 模式
+// ReAct mode or Function Call mode.
 func (engine *AgentEngine) Execute(ctx context.Context, input Input) *EventStream {
 	result := NewEventStream()
 
@@ -73,7 +44,7 @@ func (engine *AgentEngine) Execute(ctx context.Context, input Input) *EventStrea
 		// return nil, err
 	}
 	// tools
-	messageTools := engine.RenderTools(settings.Tools...)
+	messageTools := engine.renderTools(settings.Tools...)
 
 	go func() {
 		defer result.Close()
@@ -107,7 +78,7 @@ func (engine *AgentEngine) Execute(ctx context.Context, input Input) *EventStrea
 func (engine *AgentEngine) iterate(ctx context.Context,
 	inputs map[string]any, query string, contexts string,
 	tools []*llm.Tool, result *EventStream) (string, bool, error) {
-	messages, _ := engine.RenderPromptMessages(ctx, engine.Settings.PresetPrompt, inputs, query, contexts)
+	messages, _ := engine.renderPromptMessages(ctx, engine.Settings.PresetPrompt, inputs, query, contexts)
 
 	instance := llm.NewInstance(engine.Settings.LLMModel.Provider)
 	reponse, err := instance.Invoke(ctx, messages,
@@ -161,7 +132,7 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 			}
 			if toolResult == "" {
 				engine.thoughs = append(engine.thoughs,
-					llm.ToolPromptMessage("未获取任何信息", toolCalls[i].ID))
+					llm.ToolPromptMessage("no result", toolCalls[i].ID))
 				continue
 			}
 			// 记录工具调用
@@ -186,6 +157,38 @@ func (engine *AgentEngine) invokeTool(ctx context.Context, tools []string, t *ll
 		return "", err
 	}
 	return result, nil
+}
+
+// renderPromptMessages ...
+func (engine *AgentEngine) renderPromptMessages(ctx context.Context, preset string,
+	inputs map[string]any, query string, contexts string) ([]llm.Message, []string) {
+	messages := []llm.Message{}
+
+	presetPrompt := `Use the following context as your learned knowledge, inside <context></context> XML tags.\n\n<context>\n{{contexts}}\n</context>\n\nWhen answer to user:\n- If you don't know, just say that you don't know.\n- If you don't know when you are not sure, ask for clarification.\nAvoid mentioning that you obtained the information from the context.\nAnd answer according to the language of the user's question.`
+	presetPrompt += "\n" + preset
+	presetPrompt, err := prompt.Render(presetPrompt, inputs)
+	if err != nil {
+		// return nil, nil nothing here
+	}
+	_ = contexts
+
+	if query != "" {
+		messages = append(messages, llm.SystemPromptMessage(presetPrompt))
+	} else {
+		messages = append(messages, llm.UserTextPromptMessage(presetPrompt))
+	}
+
+	// if memory from history
+	if engine.opts.Memory != nil {
+		histories := engine.FetchHistoryMessages(ctx)
+		messages = append(messages, histories...)
+	}
+	if query != "" {
+		messages = append(messages, llm.UserTextPromptMessage(query)) // 本次 query
+	}
+
+	messages = append(messages, engine.thoughs...)
+	return messages, nil
 }
 
 // renderContexts 从知识库中检索相关信息
@@ -217,8 +220,8 @@ func (engine *AgentEngine) renderContexts(ctx context.Context, settings *Setting
 	return contexts, nil
 }
 
-// RenderTools ...
-func (engine *AgentEngine) RenderTools(tools ...string) []*llm.Tool {
+// renderTools ...
+func (engine *AgentEngine) renderTools(tools ...string) []*llm.Tool {
 	messageTools := make([]*llm.Tool, 0)
 	for _, toolName := range tools {
 		tool := tool.Spawn(toolName)
