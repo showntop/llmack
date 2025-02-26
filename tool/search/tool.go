@@ -3,12 +3,7 @@ package search
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"strings"
 
-	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/tool"
 	"github.com/showntop/llmack/tool/search/engine"
 )
@@ -64,6 +59,7 @@ func registSerper() {
 	tool.Register(t)
 }
 func registSearxng() {
+
 	t := &tool.Tool{}
 	t.Name = Searxng
 	t.Kind = "code"
@@ -77,32 +73,32 @@ func registSearxng() {
 	})
 	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
 		query, _ := args["query"].(string)
-
 		baseUrl := tool.DefaultConfig.GetString("searxng.base_url")
-		url := baseUrl + "/search"
 
-		payload := strings.NewReader(fmt.Sprintf(`{"q":"%s","gl":"cn"}`, query))
-
-		req, err := http.NewRequest(http.MethodGet, url, payload)
-
+		engine := engine.NewSearxng(baseUrl)
+		results, err := engine.Search(ctx, query)
 		if err != nil {
 			return "", err
 		}
-		req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux i686; rv:109.0) Gecko/20100101 Firefox/114.0")
-		req.Header.Add("Content-Type", "application/json")
-
-		resp, err := http.DefaultClient.Do(req)
+		// crawl detail
+		urls := []string{}
+		for i := 0; i < len(results); i++ {
+			urls = append(urls, results[i].Link)
+		}
+		details, err := CrawlWebpage(ctx, urls)
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
 
-		body, err := io.ReadAll(resp.Body)
+		for i := 0; i < len(results); i++ {
+			results[i].Content = details[i]
+		}
+		bytes, err := json.Marshal(results)
 		if err != nil {
 			return "", err
 		}
-		log.InfoContextf(ctx, "searxng search result: %s", string(body))
-		return string(body), nil
+		return string(bytes), nil
+
 	}
 	tool.Register(t)
 }

@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/joho/godotenv"
 
@@ -14,10 +12,10 @@ import (
 	"github.com/showntop/llmack/llm/deepseek"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/tool"
-	"github.com/showntop/llmack/tool/image"
+	"github.com/showntop/llmack/tool/file"
 	"github.com/showntop/llmack/tool/search"
 
-	"github.com/showntop/llmack/example/agi-agent/prompt"
+	"github.com/showntop/llmack/example/stock-agent/prompt"
 )
 
 func init() {
@@ -31,7 +29,7 @@ func init() {
 
 	tool.WithConfig(map[string]any{
 		"searxng": map[string]any{
-			"api_key": "http://9.134.217.159:8080",
+			"base_url": "http://9.134.217.159:8080",
 		},
 		"minimax": map[string]any{
 			"api_key": os.Getenv("minmax_api_key"),
@@ -43,12 +41,12 @@ func init() {
 }
 
 func main() {
-	// Goal Based Super AGI Agent
 	settings := engine.DefaultSettings()
-	settings.PresetPrompt = prompt.AGIPrompt
+	settings.PresetPrompt = prompt.StockPrompt
 	settings.LLMModel.Provider = deepseek.Name
 	settings.LLMModel.Name = "deepseek-r1"
-	settings.Tools = append(settings.Tools, search.Searxng, image.SiliconflowImageGenerate)
+	settings.Agent.Mode = "ReAct"
+	settings.Tools = append(settings.Tools, search.Searxng, file.WriteFile)
 	eng := engine.NewAgentEngine(settings, engine.WithLogger(&log.WrapLogger{}))
 	esm := eng.Execute(context.Background(), engine.Input{
 		Inputs: map[string]any{
@@ -70,12 +68,7 @@ func main() {
 				`Exclusively use the tools listed under "TOOLS"`,
 				`REMEMBER to format your response as JSON, using double quotes ("") around keys and string values, and commas (,) to separate items in arrays and objects. IMPORTANTLY, to use a JSON object as a string in another JSON object, you need to escape the double quotes.`,
 			},
-			"tools": renderTools(
-				search.Searxng,
-				image.SiliconflowImageGenerate,
-			),
 		},
-		// Query: "你好",
 	})
 	for evt := esm.Next(); evt != nil; evt = esm.Next() {
 		if evt.Error != nil {
@@ -89,48 +82,4 @@ func main() {
 			// fmt.Println("main event name:", evt.Name, ", data:", evt.Data)
 		}
 	}
-}
-
-func renderTools(tools ...string) string {
-	messageTools := make([]*llm.Tool, 0)
-	for _, toolName := range tools {
-		tool := tool.Spawn(toolName)
-		messageTool := &llm.Tool{
-			Type: "function",
-			Function: &llm.FunctionDefinition{
-				Name:        tool.Name,
-				Description: tool.Description,
-				Parameters: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-					"required":   []string{},
-				},
-			},
-		}
-
-		for _, p := range tool.Parameters {
-			properties := messageTool.Function.Parameters["properties"].(map[string]any)
-			properties[p.Name] = map[string]any{
-				"description": p.LLMDescrition,
-				"type":        p.Type,
-				"enum":        nil,
-			}
-			if p.Required {
-				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
-			}
-		}
-
-		messageTools = append(messageTools, messageTool)
-	}
-
-	// 组装成 1. xxx 2. yyy 格式
-	final := ""
-	for i := 0; i < len(messageTools); i++ {
-		final += strconv.Itoa(i+1) + ". "
-		final += messageTools[i].Function.Name + ":" + messageTools[i].Function.Description
-		rawArgs, _ := json.Marshal(messageTools[i].Function.Parameters)
-		final += ", args json schema: " + string(rawArgs)
-		final += "\n"
-	}
-	return final
 }

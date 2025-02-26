@@ -1,51 +1,90 @@
 package engine
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"io"
-// 	"net/http"
-// 	"strings"
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"mime/multipart"
+	"net/http"
+	"strings"
 
-// 	"github.com/showntop/llmack/log"
-// )
+	"github.com/PuerkitoBio/goquery"
+	"github.com/showntop/llmack/log"
+)
 
-// // NewSearxng create searxng client
-// func NewSearxng(url string) Searcher {
-// 	return &Searxng{baseUrl: url}
-// }
+func cleanWhitespace(s string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(s)), " ")
+}
 
-// // Searxng searxng instance
-// type Searxng struct {
-// 	baseUrl string
-// }
+// NewSearxng creates a new Searxng client
+func NewSearxng(url string) Searcher {
+	return &Searxng{baseUrl: strings.TrimSuffix(url, "/")}
+}
 
-// // Search Gets the raw HTML of a searx search result page
-// // query : The query to search for.
-// func (s *Searxng) Search(ctx context.Context, query string) ([]*Result, error) {
+type Searxng struct {
+	baseUrl string
+}
 
-// 	url := s.baseUrl + "/search"
+func (s *Searxng) Search(ctx context.Context, query string) ([]*Result, error) {
+	url := s.baseUrl + "/search"
 
-// 	payload := strings.NewReader(fmt.Sprintf(`{"q":"%s","gl":"cn"}`, query))
+	payload := &bytes.Buffer{}
+	writer := multipart.NewWriter(payload)
+	_ = writer.WriteField("q", query)
+	// _ = writer.WriteField("format", "json")
 
-// 	req, err := http.NewRequest(http.MethodGet, url, payload)
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
 
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux i686; rv:109.0) Gecko/20100101 Firefox/114.0")
-// 	req.Header.Add("Content-Type", "application/json")
+	log.InfoContextf(ctx, "searxng search url: %s query:%s", url, query)
+	req, err := http.NewRequest(http.MethodPost, url, payload)
 
-// 	resp, err := http.DefaultClient.Do(req)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux i686; rv:109.0) Gecko/20100101 Firefox/114.0")
+	req.Header.Add("Content-Type", writer.FormDataContentType())
 
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	log.InfoContextf(ctx, "searxng search result: %s", string(body))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-// }
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parse html failed: %w", err)
+	}
+	var results []*Result
+	n := 1
+	doc.Find(`#results #urls article`).Each(func(i int, resultDiv *goquery.Selection) {
+		header := resultDiv.Find("h3, h4").First()
+		if header.Length() == 0 {
+			return
+		}
+
+		link, exists := header.Find("a").Attr("href")
+		if !exists {
+			return
+		}
+
+		title := cleanWhitespace(header.Text())
+		snippet := cleanWhitespace(resultDiv.Find("p").First().Text())
+
+		var sources []string
+		resultDiv.Find(`.pull-right span, .engines span`).Each(func(j int, s *goquery.Selection) {
+			sources = append(sources, cleanWhitespace(s.Text()))
+		})
+
+		results = append(results, &Result{
+			Link:    link,
+			Title:   title,
+			Snippet: snippet,
+			// Extra:   map[string]interface{}{"sources": sources},
+		})
+		n++
+	})
+	log.InfoContextf(ctx, "searxng search completed with %d results", len(results))
+	return results, nil
+}

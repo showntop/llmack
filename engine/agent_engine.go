@@ -3,10 +3,11 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"log"
 
 	"github.com/showntop/llmack/llm"
+	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/pkg/strings"
+	"github.com/showntop/llmack/program"
 	"github.com/showntop/llmack/prompt"
 	"github.com/showntop/llmack/rag"
 	"github.com/showntop/llmack/tool"
@@ -53,7 +54,7 @@ func (engine *AgentEngine) Execute(ctx context.Context, input Input) *EventStrea
 		finish := false
 		for i := 0; i <= 5 && !finish; i++ { // 最大5次
 			if i == 5 { // 最后一次不使用工具
-				messageTools = nil
+				// messageTools = nil
 			}
 			response, finish, err := engine.iterate(ctx, inputs, query, contexts, messageTools, result)
 			if err != nil { // send error
@@ -75,13 +76,55 @@ func (engine *AgentEngine) Execute(ctx context.Context, input Input) *EventStrea
 	return result
 }
 
-func (engine *AgentEngine) iterate(ctx context.Context,
+func (engine *AgentEngine) iterateByReAct(ctx context.Context,
+	inputs map[string]any, query string, contexts string,
+	tools []*llm.Tool, eventSteam *EventStream) (string, bool, error) {
+
+	var result struct {
+		Tool *struct {
+			Name string         `json:"name"`
+			Args map[string]any `json:"args"`
+		}
+		Thoughts struct {
+			Text    string `json:"text"`
+			Reason  string `json:"reasoning"`
+			Plan    string `json:"plan"`
+			Critism string `json:"criticism"`
+			Speak   string `json:"speak"`
+		}
+	}
+
+	var rawResult string
+	err := program.ReAct(program.WithLLM(engine.Settings.LLMModel.Provider, engine.Settings.LLMModel.Name)).
+		WithInstruction(engine.Settings.PresetPrompt).
+		WithTools(tools...).
+		ChatWith(inputs).
+		Result(ctx, &rawResult)
+	if err != nil {
+		return "", false, err
+	}
+	if err := json.Unmarshal([]byte(rawResult), &result); err != nil {
+		return "", false, err
+	}
+
+	if result.Tool != nil {
+		// TODO check function name valid?
+		toolResult, err := tool.Spawn(result.Tool.Name).Invoke(ctx, result.Tool.Args)
+		log.InfoContextf(ctx, "AgentEngine invokeTool: %s, %v response: %s error: %v \n", result.Tool.Name, result.Tool.Args, toolResult, err)
+		if err != nil {
+			return "", false, err
+		}
+		return toolResult, false, nil
+	}
+	return "", true, nil
+}
+
+func (engine *AgentEngine) iterateByFunCall(ctx context.Context,
 	inputs map[string]any, query string, contexts string,
 	tools []*llm.Tool, result *EventStream) (string, bool, error) {
 	messages, _ := engine.renderPromptMessages(ctx, engine.Settings.PresetPrompt, inputs, query, contexts)
-
 	instance := llm.NewInstance(engine.Settings.LLMModel.Provider)
-	reponse, err := instance.Invoke(ctx, messages,
+	response, err := instance.Invoke(ctx, messages,
 		llm.WithTools(tools...),
 		llm.WithStream(engine.Settings.Stream),
 		llm.WithModel(engine.Settings.LLMModel.Name),
@@ -89,9 +132,9 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 	if err != nil {
 		return "", false, err
 	}
-	stream := reponse.Stream()
+	stream := response.Stream()
 	toolCalls := []*llm.ToolCall{}
-	response := ""
+	final := ""
 	finish := false
 
 	// fill tool calls from chunk
@@ -119,12 +162,12 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 			continue
 		}
 
-		response += r.Delta.Message.Content()
+		final += r.Delta.Message.Content()
 		result.Push(ToastEvent(r))
 	}
 
 	if len(toolCalls) > 0 {
-		engine.thoughs = append(engine.thoughs, llm.AssistantPromptMessage(string(response)).WithToolCalls(toolCalls))
+		engine.thoughs = append(engine.thoughs, llm.AssistantPromptMessage(string(final)).WithToolCalls(toolCalls))
 		for i := 0; i < len(toolCalls); i++ {
 			toolResult, err := engine.invokeTool(ctx, engine.Settings.Tools, toolCalls[i])
 			if err != nil { // 调用工具出错
@@ -140,10 +183,22 @@ func (engine *AgentEngine) iterate(ctx context.Context,
 				llm.ToolPromptMessage(toolResult, toolCalls[i].ID))
 		}
 	} else {
-		response += "\n"
+		final += "\n"
 		finish = true
 	}
-	return response, finish, nil
+	return final, finish, nil
+}
+
+func (engine *AgentEngine) iterate(ctx context.Context,
+	inputs map[string]any, query string, contexts string,
+	tools []*llm.Tool, result *EventStream) (string, bool, error) {
+
+	if engine.Settings.Agent.Mode == "ReAct" {
+		return engine.iterateByReAct(ctx, inputs, query, contexts, tools, result)
+	} else if engine.Settings.Agent.Mode == "FunCall" {
+		return engine.iterateByFunCall(ctx, inputs, query, contexts, tools, result)
+	}
+	return "", false, nil
 }
 
 // "ToolCalls":[{"Id":"call_cr1kufc2c3m560b2ioe0","Type":"function","Function":{"Name":"weather","Arguments":"{\"city\":\"北京三里屯\"}"}}]}}]
@@ -152,7 +207,7 @@ func (engine *AgentEngine) invokeTool(ctx context.Context, tools []string, t *ll
 	var args map[string]any
 	json.Unmarshal([]byte(t.Function.Arguments), &args)
 	result, err := tool.Spawn(t.Function.Name).Invoke(ctx, args)
-	log.Printf("AgentEngine invokeTool: %s, %s response: %s error: %v \n", t.Function.Name, t.Function.Arguments, result, err)
+	log.InfoContextf(ctx, "AgentEngine invokeTool: %s, %s response: %s error: %v \n", t.Function.Name, t.Function.Arguments, result, err)
 	if err != nil {
 		return "", err
 	}
@@ -168,8 +223,10 @@ func (engine *AgentEngine) renderPromptMessages(ctx context.Context, preset stri
 	presetPrompt += "\n" + preset
 	presetPrompt, err := prompt.Render(presetPrompt, inputs)
 	if err != nil {
+		panic(err)
 		// return nil, nil nothing here
 	}
+
 	_ = contexts
 
 	if query != "" {

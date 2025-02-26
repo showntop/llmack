@@ -102,7 +102,6 @@ func (ada *MarkableAdapter) Parse(completion string) map[string]any {
 	sections := make([][2]string, 1)
 	for _, line := range strings.Split(completion, "\n") {
 		match := fieldHeaderPattern.FindStringSubmatch(strings.TrimSpace(line))
-		fmt.Println("nnooonnnn: ", line, match)
 		if match != nil {
 			sections = append(sections, [2]string{match[1], ""})
 		} else {
