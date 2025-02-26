@@ -6,57 +6,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
 	"github.com/showntop/llmack/log"
 )
 
-type options struct {
-	kind string
-	key  string
-}
-
-// Option ...
-type Option func(*options)
-
-// WithKind ...
-func WithKind(k string) Option {
-	return func(o *options) {
-		o.kind = k
-	}
-}
-
-// WithKey ...
-func WithKey(k string) Option {
-	return func(o *options) {
-		o.key = k
-	}
-}
-
 // NewSerper 创建serper
-func NewSerper(optxs ...Option) Searcher {
-	opts := &options{}
-	for i := 0; i < len(optxs); i++ {
-		optxs[i](opts)
-	}
-	if opts.kind == "" {
-		opts.kind = "search"
-	}
-	return &Serper{apiKey: opts.key, kind: opts.kind, options: opts}
+func NewSerper(apiKey string, kind string) Searcher {
+	return &Serper{apiKey: apiKey, kind: kind}
 }
 
 // Serper 使用serper搜索
 type Serper struct {
-	options *options
-	apiKey  string
-	kind    string
-}
-
-// Category ....
-func (s *Serper) Category() string {
-	return "all"
+	apiKey string
+	kind   string
 }
 
 // Search 使用serper搜索
@@ -72,7 +36,7 @@ func (s *Serper) Search(ctx context.Context, query string) ([]*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("X-API-KEY", os.Getenv("serper_api_key"))
+	req.Header.Add("X-API-KEY", s.apiKey)
 	req.Header.Add("Content-Type", "application/json")
 
 	res, err := http.DefaultClient.Do(req)

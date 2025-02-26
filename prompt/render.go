@@ -1,7 +1,9 @@
 package prompt
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -14,7 +16,36 @@ func Render(template string, values map[string]any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return tmpl.Execute(pongo2.Context(values))
+	params := make(map[string]any)
+	for k, v := range values {
+		kind := reflect.TypeOf(v).Kind()
+		switch kind {
+		case reflect.Slice, reflect.Array:
+			vv := rendSlice(v)
+			params[k] = string(vv)
+		case reflect.Struct, reflect.Map:
+			vv, _ := json.Marshal(&v)
+			params[k] = string(vv)
+		default:
+			params[k] = v
+		}
+	}
+	return tmpl.Execute(pongo2.Context(params))
+}
+
+// 转换 slice 为 1. xxx 2. yyy 格式
+func rendSlice(slice any) string {
+	if reflect.TypeOf(slice).Kind() != reflect.Slice {
+		return ""
+	}
+	sliceValue := reflect.ValueOf(slice)
+	result := ""
+	for i := 0; i < sliceValue.Len(); i++ {
+		result += strconv.Itoa(i+1) + ". "
+		result += toString(sliceValue.Index(i).Interface())
+		result += "\n"
+	}
+	return result
 }
 
 func render(template string, values map[string]any) (string, error) {
@@ -163,6 +194,6 @@ func toString(val any) string {
 	case bool:
 		return strconv.FormatBool(val)
 	default:
-		return fmt.Sprintf("%s", val)
+		return fmt.Sprintf("%+v", val)
 	}
 }

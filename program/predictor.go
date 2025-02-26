@@ -2,6 +2,7 @@ package program
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/showntop/llmack/llm"
@@ -16,36 +17,6 @@ type predictor struct {
 	inputs  map[string]any
 
 	Promptx
-}
-
-type option func(*predictor)
-
-// WithInstruction ...
-func WithInstruction(info string) option {
-	return func(p *predictor) {
-		p.Promptx.Instruction = info
-	}
-}
-
-// WithOutput ...
-func WithOutput(tuple ...any) option {
-	return func(p *predictor) {
-		if len(tuple) <= 0 {
-			return
-		}
-		out := &Field{Name: tuple[0].(string)}
-		if len(tuple) >= 2 {
-			out.Description = tuple[1].(string)
-		}
-		if len(tuple) >= 3 {
-			out.Marker = tuple[2].(string)
-		}
-		if len(tuple) >= 4 {
-			out.Type = tuple[3].(reflect.Kind)
-		}
-		// 重复 ？
-		p.Promptx.OutputFields[out.Name] = out
-	}
 }
 
 // NewPredictor ...
@@ -79,23 +50,30 @@ func NewPredictorWithPrompt(prompt *Promptx, opts ...option) *predictor {
 }
 
 // Predictor ...
-func Predictor() *predictor {
-	return &predictor{
-		model:   defaultLLM,
+func Predictor(opts ...option) *predictor {
+	p := &predictor{
 		adapter: &JSONAdapter{},
 		Promptx: Promptx{InputFields: make(map[string]*Field), OutputFields: make(map[string]*Field)},
 	}
-}
+	for i := 0; i < len(opts); i++ {
+		opts[i](p)
+	}
+	if p.model == nil {
+		p.model = defaultLLM
+	}
 
-// WithInstruction ...
-func (p *predictor) WithInstruction(i string) *predictor {
-	p.Promptx.Instruction = i
 	return p
 }
 
 // WithAdapter ...
 func (p *predictor) WithAdapter(adapter Adapter) *predictor {
 	p.adapter = adapter
+	return p
+}
+
+// WithInstruction ...
+func (p *predictor) WithInstruction(i string) *predictor {
+	p.Promptx.Instruction = i
 	return p
 }
 
@@ -113,7 +91,7 @@ func (p *predictor) WithInputFields(inputs map[string]string) *predictor {
 	return p
 }
 
-// WithOutputField ...
+// WithOutputField tuple is name, description, marker, type
 func (p *predictor) WithOutputField(tuple ...any) *predictor {
 	if len(tuple) <= 0 {
 		return p
@@ -173,7 +151,7 @@ func (p *predictor) Forward(ctx context.Context, inputs map[string]any) (any, er
 // Result ...
 func (p *predictor) Result(ctx context.Context, value any) error {
 	if reflect.TypeOf(value).Kind() != reflect.Ptr {
-		// return fmt.Errorf("result target value must be a pointer")
+		return fmt.Errorf("predictor result target value must be a pointer")
 	}
 
 	messages, err := p.adapter.Format(p, p.inputs, value)

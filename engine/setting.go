@@ -36,7 +36,8 @@ type Settings struct {
 		Name     string `json:"name"`
 	} `json:"llm_model"`
 	Agent struct {
-		MaxIteration int `json:"max_iteration"`
+		Mode         string `json:"mode"`
+		MaxIteration int    `json:"max_iteration"`
 	}
 	Workflow *workflow.Workflow `json:"workflow"`
 	Tools    []string           `json:"tools"`

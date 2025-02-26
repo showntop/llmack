@@ -11,7 +11,7 @@ import (
 // var defaultLLM = llm.NewInstance(hunyuan.Name, llm.WithDefaultModel("hunyuan"))
 var defaultLLM = llm.NewInstance(zhipu.Name, llm.WithDefaultModel("GLM-4-Flash"))
 
-// SetLLM ...
+// SetLLM can not set concurrent
 func SetLLM(provider, model string) {
 	defaultLLM = llm.NewInstance(provider, llm.WithDefaultModel(model))
 }
