@@ -17,7 +17,7 @@ func init() {
 		Name: "city", Type: tool.String, Required: true, LLMDescrition: "城市", Default: "北京",
 	})
 	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
-		return "晴朗", nil
+		return "晴朗，北风三级，2-15 摄氏度，空气质量优。", nil
 	}
 	tool.Register(t)
 }

@@ -21,7 +21,7 @@ func Render(template string, values map[string]any) (string, error) {
 		kind := reflect.TypeOf(v).Kind()
 		switch kind {
 		case reflect.Slice, reflect.Array:
-			vv := rendSlice(v)
+			vv := renderSlice(v)
 			params[k] = string(vv)
 		case reflect.Struct, reflect.Map:
 			vv, _ := json.Marshal(&v)
@@ -34,7 +34,7 @@ func Render(template string, values map[string]any) (string, error) {
 }
 
 // 转换 slice 为 1. xxx 2. yyy 格式
-func rendSlice(slice any) string {
+func renderSlice(slice any) string {
 	if reflect.TypeOf(slice).Kind() != reflect.Slice {
 		return ""
 	}
@@ -160,6 +160,7 @@ func toString(val any) string {
 	if val == nil {
 		return "nil" // f'None' -> "None"
 	}
+	fmt.Println(val)
 	switch val := val.(type) {
 	case string:
 		return val

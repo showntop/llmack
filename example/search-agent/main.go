@@ -37,8 +37,8 @@ func init() {
 }
 
 func main() {
-	serve()
-	// cmd()
+	// serve()
+	cmd()
 }
 
 func serve() {

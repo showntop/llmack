@@ -9,7 +9,7 @@ import (
 
 	"github.com/showntop/llmack/engine"
 	"github.com/showntop/llmack/llm"
-	"github.com/showntop/llmack/llm/deepseek"
+	"github.com/showntop/llmack/llm/qwen"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/tool"
 	"github.com/showntop/llmack/tool/file"
@@ -23,8 +23,9 @@ func init() {
 
 	godotenv.Load()
 	llm.WithSingleConfig(map[string]any{
-		"api_key":  os.Getenv("deepseek_api_key2"),
-		"base_url": "https://api.lkeap.cloud.tencent.com/v1",
+		"api_key": os.Getenv("qwen_api_key"),
+		// "api_key":  os.Getenv("deepseek_api_key2"),
+		// "base_url": "https://api.lkeap.cloud.tencent.com/v1",
 	})
 
 	tool.WithConfig(map[string]any{
@@ -43,8 +44,9 @@ func init() {
 func main() {
 	settings := engine.DefaultSettings()
 	settings.PresetPrompt = prompt.StockPrompt
-	settings.LLMModel.Provider = deepseek.Name
-	settings.LLMModel.Name = "deepseek-r1"
+	settings.LLMModel.Provider = qwen.Name
+	// settings.LLMModel.Name = "deepseek-r1"
+	settings.LLMModel.Name = "qwen-plus"
 	settings.Agent.Mode = "ReAct"
 	settings.Tools = append(settings.Tools, search.Searxng, file.WriteFile)
 	eng := engine.NewAgentEngine(settings, engine.WithLogger(&log.WrapLogger{}))

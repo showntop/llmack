@@ -34,15 +34,18 @@ func init() {
 
 func main() {
 	settings := engine.DefaultSettings()
-	settings.PresetPrompt = "你是一个AI写作助手，使用网络信息写文章"
+	settings.PresetPrompt = "你是一个AI写作助手，使用网络信息写文章，主题:{{topic}}"
 	settings.LLMModel.Provider = deepseek.Name
 	// settings.LLMModel.Provider = qwen.Name
 	// settings.LLMModel.Name = "qwen-plus"
 	settings.LLMModel.Name = "deepseek-v3"
+	settings.Agent.Mode = "FunCall"
 	settings.Tools = append(settings.Tools, datetime.GetDate, search.Serper)
 	eng := engine.NewAgentEngine(settings, engine.WithLogger(&log.WrapLogger{}))
 	esm := eng.Execute(context.Background(), engine.Input{
-		Query: `主题：科技能改变世界吗？`,
+		Inputs: map[string]any{
+			"topic": "科技能改变世界吗？",
+		},
 	})
 	for evt := esm.Next(); evt != nil; evt = esm.Next() {
 		if evt.Error != nil {

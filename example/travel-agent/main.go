@@ -16,6 +16,8 @@ import (
 )
 
 func init() {
+	log.SetLogger(&log.WrapLogger{})
+
 	godotenv.Load()
 	llm.WithSingleConfig(map[string]any{
 		// "api_key":  os.Getenv("deepseek_api_key2"),
@@ -27,14 +29,17 @@ func init() {
 
 func main() {
 	settings := engine.DefaultSettings()
-	settings.PresetPrompt = "你是一个AI助手"
+	settings.PresetPrompt = "你是一个AI助手，请帮我处理以下问题：\n{{query}}"
 	// settings.LLMModel.Provider = deepseek.Name
 	settings.LLMModel.Provider = openaic.Name
 	settings.LLMModel.Name = "hunyuan"
 	settings.Tools = append(settings.Tools, weather.QueryWeather)
+	settings.Agent.Mode = "FunCall"
 	eng := engine.NewAgentEngine(settings, engine.WithLogger(&log.WrapLogger{}))
 	esm := eng.Execute(context.Background(), engine.Input{
-		Query: "我要去北京旅游，请观察天气，规划一下旅程。",
+		Inputs: map[string]any{
+			"query": "我要去北京旅游，规划一下旅程。",
+		},
 	})
 	for evt := esm.Next(); evt != nil; evt = esm.Next() {
 		if evt.Error != nil {

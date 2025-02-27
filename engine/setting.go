@@ -9,7 +9,7 @@ import (
 
 // DefaultSettings ...
 func DefaultSettings() *Settings {
-	return &Settings{
+	setting := &Settings{
 		PresetPrompt: "",
 		Preamble:     "",
 		Knowledge:    make([]rag.Options, 0),
@@ -24,6 +24,9 @@ func DefaultSettings() *Settings {
 		Tools:    nil,
 		Stream:   true,
 	}
+	setting.Agent.Mode = "FunCall"
+	setting.Agent.MaxIteration = 20
+	return setting
 }
 
 // Settings ...
