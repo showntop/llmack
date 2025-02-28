@@ -42,16 +42,21 @@ func (engine *AgentEngine) Execute(ctx context.Context, input Input) *EventStrea
 
 	var result *program.Result
 	if settings.Agent.Mode == "ReAct" {
-		var answer string
-		err := program.ReAct(program.WithLLM(engine.Settings.LLMModel.Provider, engine.Settings.LLMModel.Name)).
+		result = program.ReAct(program.WithLLM(engine.Settings.LLMModel.Provider, engine.Settings.LLMModel.Name)).
 			WithInstruction(engine.Settings.PresetPrompt).
 			WithTools(settings.Tools...).
-			Invoke(ctx, inputs).
-			Get(&answer)
-		if err != nil {
-			response.Push(ErrorEvent(err))
+			Invoke(ctx, inputs)
+		if result.Error() != nil {
+			response.Push(ErrorEvent(result.Error()))
 			return response
 		}
+		go func() {
+			defer response.Close()
+			for message := range result.Stream() {
+				response.Push(ToastEvent(message))
+			}
+			response.Push(EndEvent(result.Completion()))
+		}()
 	} else {
 		result = program.FunCall(program.WithLLM(engine.Settings.LLMModel.Provider, engine.Settings.LLMModel.Name)).
 			WithInstruction(engine.Settings.PresetPrompt).
