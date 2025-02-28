@@ -9,6 +9,7 @@ import (
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/showntop/llmack/llm"
+	"github.com/showntop/llmack/log"
 )
 
 const (
@@ -84,8 +85,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 		Model:    openai.F(opts.Model),
 	}
 	rawx, _ := json.Marshal(params)
-	fmt.Println(string(rawx))
-
+	log.InfoContextf(ctx, "Openai-c chat request payload %s", string(rawx))
 	stream := m.client.Chat.Completions.NewStreaming(ctx, params)
 
 	// 流式响应

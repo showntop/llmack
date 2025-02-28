@@ -7,7 +7,6 @@ import (
 
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
-	"github.com/showntop/llmack/prompt"
 )
 
 // predictor ...
@@ -128,16 +127,6 @@ func (p *predictor) Update(opts ...option) {
 	}
 }
 
-// FormatWith implement format for {{$xxx}}
-func (p *predictor) FormatWith(inputs map[string]any) *predictor {
-	x, err := prompt.Render(p.Promptx.Instruction, inputs)
-	// @TODO handle error
-	if err != nil {
-	}
-	p.Promptx.Instruction = x
-	return p
-}
-
 // Forward // TODO: implement forward pass
 func (p *predictor) Forward(ctx context.Context, inputs map[string]any) (any, error) {
 	var value any
@@ -146,6 +135,50 @@ func (p *predictor) Forward(ctx context.Context, inputs map[string]any) (any, er
 	}
 
 	return value, nil
+}
+
+// Invoke invoke forward for predicte
+func (p *predictor) Invoke(ctx context.Context, inputs map[string]any) *Result {
+	var value Result
+	value.p = p
+	messages, err := p.adapter.Format(p, inputs, value)
+	if err != nil {
+		value.err = err
+		return &value
+	}
+	response, err := p.model.Invoke(ctx, messages,
+		llm.WithStream(true),
+	)
+	if err != nil {
+		value.err = err
+		return &value
+	}
+	completion := response.Result().Message.Content()
+	value.completion = completion
+	return &value
+}
+
+type Result struct {
+	p          *predictor
+	err        error
+	completion string
+	stream     chan any
+}
+
+func (r *Result) Get(value any) error {
+	return r.p.adapter.Parse(r.completion, value)
+}
+
+func (r *Result) Error() error {
+	return r.err
+}
+
+func (r *Result) Completion() string {
+	return r.completion
+}
+
+func (r *Result) Stream() chan any {
+	return r.stream
 }
 
 // Result ...
@@ -168,4 +201,8 @@ func (p *predictor) Result(ctx context.Context, value any) error {
 	log.InfoContextf(ctx, "response: %s", completion)
 
 	return p.adapter.Parse(completion, value)
+}
+
+func (r *predictor) FetchHistoryMessages(ctx context.Context) []llm.Message {
+	return nil
 }
