@@ -65,6 +65,8 @@ func (rp *funcall) Invoke(ctx context.Context, inputs map[string]any) *Result {
 		for i := 0; i < 20; i++ {
 			result, finish, err := rp.invoke(ctx, inputs)
 			if err != nil {
+				value.err = err
+				log.ErrorContextf(ctx, "agent funcall invoke error: %v", err)
 				continue
 			}
 			_ = result

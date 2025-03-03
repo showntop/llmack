@@ -20,8 +20,6 @@ type AgentEngine struct {
 func NewAgentEngine(settings *Settings, opts ...Option) Engine {
 	r := &AgentEngine{}
 	r.BotEngine = *NewBotEngine(opts...)
-	// load tools
-
 	r.Settings = settings
 	return r
 }
