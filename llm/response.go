@@ -42,10 +42,13 @@ func (resp *Response) Result() *Result {
 	resp.result = &Result{}
 	// 合并 message
 	text := ""
+	text2 := ""
 	for it := resp.stream.Next(); it != nil; it = resp.stream.Next() {
 		text += it.Delta.Message.content
+		text2 += it.Delta.Message.ReasoningContent
 	}
 	message := AssistantPromptMessage(text)
+	message.ReasoningContent = text2
 	resp.result.Message = message
 	return resp.result
 }

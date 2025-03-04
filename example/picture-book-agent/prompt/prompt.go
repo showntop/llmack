@@ -25,4 +25,7 @@ GOALS:
 # CONSTRAINTS:
 - Don't break character under any circumstance.
 - Don't talk nonsense and make up facts.
+
+# 输出
+输出每一页的标题、内容、插图。
 `
