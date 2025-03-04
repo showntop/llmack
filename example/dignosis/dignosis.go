@@ -8,13 +8,12 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/showntop/llmack/engine"
-	"github.com/showntop/llmack/example/picture-book-agent/prompt"
+	"github.com/showntop/llmack/example/dignosis/prompt"
 	"github.com/showntop/llmack/llm"
+	"github.com/showntop/llmack/llm/deepseek"
 	openaic "github.com/showntop/llmack/llm/openai-c"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/tool"
-	"github.com/showntop/llmack/tool/file"
-	"github.com/showntop/llmack/tool/image"
 	"github.com/showntop/llmack/tool/user"
 )
 
@@ -45,21 +44,19 @@ func init() {
 
 func main() {
 	settings := engine.DefaultSettings()
-	settings.PresetPrompt = prompt.CreatePictureBookPrompt
-	// settings.LLMModel.Provider = deepseek.Name
-	// settings.LLMModel.Name = "deepseek-v3"
+	settings.PresetPrompt = prompt.DignosisPrompt
+	settings.LLMModel.Provider = deepseek.Name
+	settings.LLMModel.Name = "deepseek-r1"
 	// settings.LLMModel.Provider = qwen.Name
 	// settings.LLMModel.Name = "qwen-plus"
 	// settings.LLMModel.Provider = hunyuan.Name
 	settings.LLMModel.Provider = openaic.Name
 	settings.LLMModel.Name = "hunyuan-large"
 	settings.Agent.Mode = "ReAct"
-	settings.Tools = append(settings.Tools, user.Inquery, image.SiliconflowImageGenerate, file.WriteFile)
+	settings.Tools = append(settings.Tools, user.Inquery)
 	eng := engine.NewAgentEngine(settings, engine.WithLogger(&log.WrapLogger{}))
 	esm := eng.Execute(context.Background(), engine.Input{
-		Inputs: map[string]any{
-			"topic": "小猫钓鱼",
-		},
+		Inputs: map[string]any{},
 	})
 	finalAnswer := ""
 	for evt := esm.Next(); evt != nil; evt = esm.Next() {
@@ -70,7 +67,7 @@ func main() {
 		if cv, ok := evt.Data.(*llm.Chunk); ok {
 			_ = cv
 			fmt.Println("main chunk:", cv.Delta.Message)
-			finalAnswer += cv.Delta.Message.Content()
+			finalAnswer += cv.Delta.Message.ReasoningContent
 		} else {
 			// fmt.Println("main event name:", evt.Name, ", data:", evt.Data)
 		}

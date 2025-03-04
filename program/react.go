@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/showntop/flatmap"
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/prompt"
@@ -24,11 +25,12 @@ type ReactResult struct {
 		Args map[string]any `json:"args"`
 	}
 	Thoughts *struct {
-		Text    string `json:"text"`
-		Reason  string `json:"reasoning"`
-		Plan    any    `json:"plan"`
-		Critism string `json:"criticism"`
-		Speak   string `json:"speak"`
+		SelfReason string `json:"self_reason"`
+		Text       string `json:"text"`
+		Reason     string `json:"reasoning"`
+		Plan       any    `json:"plan"`
+		Critism    string `json:"criticism"`
+		Speak      string `json:"speak"`
 	} `json:"thoughts"`
 }
 
@@ -62,8 +64,11 @@ func (rp *react) WithTools(tools ...string) *react {
 		Type: "function",
 		Function: &llm.FunctionDefinition{
 			Name:        "finish",
-			Description: "Signals that the final outputs, i.e. {outputs}, are now available and marks the task as complete.",
-			Parameters:  map[string]any{"Completed": true},
+			Description: "use this to signal that you have finished all your objectives.",
+			Parameters: map[string]any{
+				"response": "final response to let people know you have finished your objectives",
+				"continue": "finish task or output to stdout",
+			},
 		},
 	})
 	instruction := rp.Instruction
@@ -94,7 +99,7 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 	value.p = rp.predictor
 
 	thoughts := []map[string]any{}
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		result, err := rp.invoke(ctx, inputs, thoughts)
 		if err != nil {
 			continue
@@ -105,38 +110,31 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 				thoughts = append(thoughts, map[string]any{
 					"thought":     result.Thoughts.Text,
 					"tool_name":   result.Tool.Name,
-					"observation": "Completed",
+					"tool_args":   result.Tool.Args,
+					"tool_result": "finished",
 				})
 				break
 			} else {
 				// TODO check function name valid?
 				toolResult, err := tool.Spawn(result.Tool.Name).Invoke(ctx, result.Tool.Args)
-				log.InfoContextf(ctx, "react agent invoke tool: %s, %v response: %s error: %v \n", result.Tool.Name, result.Tool.Args, "toolResult", err)
+				log.InfoContextf(ctx, "react agent invoke tool: %s, %v response: %s error: %v \n", result.Tool.Name, result.Tool.Args, toolResult, err)
 				if err != nil {
 					continue
 				}
 				thoughts = append(thoughts, map[string]any{
-					"thought":     result.Thoughts.Text,
+					"thought":     result.Thoughts,
 					"tool_name":   result.Tool.Name,
-					"observation": toolResult,
+					"tool_args":   result.Tool.Args,
+					"tool_result": toolResult,
 				})
 			}
 		}
 	}
 
-	thoughtsText := "this is your trajectory: \n"
-	for i, t := range thoughts {
-		is := strconv.Itoa(i)
-		thoughtsText += "thought_" + is + ": \n"
-		thoughtsText += t["thought"].(string) + "\n"
-		thoughtsText += "tool_name: " + t["tool_name"].(string) + "\n"
-		thoughtsText += "observation: \n"
-		thoughtsText += fmt.Sprintf("%v", t["observation"]) + "\n"
-	}
 	messages := []llm.Message{}
 	iii, _ := prompt.Render(rp.userInstruction, inputs)
 	messages = append(messages, llm.UserTextPromptMessage(iii))
-	messages = append(messages, llm.AssistantPromptMessage(thoughtsText))
+	messages = append(messages, llm.AssistantPromptMessage(rp.renderThoughts(thoughts)))
 	messages = append(messages, llm.UserTextPromptMessage("continue"))
 	response, err := rp.model.Invoke(ctx, messages,
 		llm.WithStream(true),
@@ -162,17 +160,8 @@ func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []m
 		return nil, err
 	}
 	if len(thoughts) > 0 {
-		thoughtsText := "this is your trajectory: \n"
-		for i, t := range thoughts {
-			is := strconv.Itoa(i)
-			thoughtsText += "thought_" + is + ": \n"
-			thoughtsText += t["thought"].(string) + "\n"
-			thoughtsText += "tool_name: " + t["tool_name"].(string) + "\n"
-			thoughtsText += "observation: \n"
-			thoughtsText += fmt.Sprintf("%v", t["observation"]) + "\n"
-		}
-		messages = append(messages, llm.AssistantPromptMessage(thoughtsText))
-		messages = append(messages, llm.UserTextPromptMessage("continue"))
+		messages = append(messages, llm.AssistantPromptMessage(rp.renderThoughts(thoughts)))
+		messages = append(messages, llm.UserTextPromptMessage("Determine next step to do(tool use or output), and respond using the format specified in above."))
 	}
 	response, err := rp.model.Invoke(ctx, messages,
 		llm.WithStream(true),
@@ -186,7 +175,6 @@ func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []m
 	rawResult = strings.TrimRight(rawResult, "```")
 	rawResult = strings.ReplaceAll(rawResult, "\n", "")
 	if err := json.Unmarshal([]byte(rawResult), &result); err != nil {
-		// panic(err)
 		log.WarnContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, err)
 		return nil, err
 	}
@@ -196,6 +184,24 @@ func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []m
 	}
 	log.InfoContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, err)
 	return &result, nil
+}
+
+func (rp *react) renderThoughts(thoughts []map[string]any) string {
+	thoughtsText := "# this is your trajectory: \n"
+	for i, t := range thoughts {
+		is := strconv.Itoa(i)
+		thoughtsText += "\n[ thought " + is + "]\n"
+		fmap, err := flatmap.Flatten(t, flatmap.DefaultTokenizer)
+		if err != nil {
+			raw, _ := json.Marshal(&t)
+			thoughtsText += string(raw) + "\n"
+			continue
+		}
+		fmap.Each(func(k string, v interface{}) {
+			thoughtsText += k + ": " + fmt.Sprintf("%+v", v) + "\n"
+		})
+	}
+	return thoughtsText
 }
 
 // renderTools ...

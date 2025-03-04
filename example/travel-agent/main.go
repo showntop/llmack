@@ -12,6 +12,8 @@ import (
 	openaic "github.com/showntop/llmack/llm/openai-c"
 	"github.com/showntop/llmack/log"
 
+	"github.com/showntop/llmack/tool/file"
+	"github.com/showntop/llmack/tool/search"
 	"github.com/showntop/llmack/tool/weather"
 )
 
@@ -31,14 +33,14 @@ func init() {
 
 func main() {
 	settings := engine.DefaultSettings()
-	settings.PresetPrompt = "你是一个AI助手，请帮我处理以下问题：\n{{query}}"
+	settings.PresetPrompt = prompt
 	// settings.LLMModel.Provider = deepseek.Name
 	settings.LLMModel.Provider = openaic.Name
 	settings.LLMModel.Name = "hunyuan-large"
 	// settings.LLMModel.Name = "deepseek-v3"
 	// settings.LLMModel.Provider = zhipu.Name
 	// settings.LLMModel.Name = "glm-4v-flash"
-	settings.Tools = append(settings.Tools, weather.QueryWeather)
+	settings.Tools = append(settings.Tools, weather.QueryWeather, search.DuckDuckGo, file.WriteFile)
 	settings.Agent.Mode = "ReAct"
 	eng := engine.NewAgentEngine(settings, engine.WithLogger(&log.WrapLogger{}))
 	esm := eng.Execute(context.Background(), engine.Input{
@@ -57,3 +59,16 @@ func main() {
 		}
 	}
 }
+
+var prompt = `
+[Goals]
+提供一份2025年3月10日从北京到上海，3月21日返回的旅行计划。
+制定一个我可以去的旅游景点、餐馆、酒吧等地方的行程，可以满足我预定的日期和价格。
+在Notion上制作详细的行程页面。
+
+[constraints]
+如果你不确定你以前是怎么做的，或者想回忆过去的事情，想想类似的事情会帮助你记忆。
+确保工具和参数符合当前的计划和推理。
+仅使用列出的工具。
+记住将您的回复格式为JSON，在键和字符串值周围使用双引号（""），并使用逗号（,）分隔数组和对象中的项。重要的是，要在另一个JSON对象中使用JSON对象作为字符串，需要转义双引号。
+`
