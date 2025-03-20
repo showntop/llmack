@@ -14,6 +14,8 @@ import (
 	"github.com/showntop/llmack/tool"
 )
 
+var MaxIterationNum = 50
+
 type react struct {
 	*predictor
 	userInstruction string
@@ -48,7 +50,7 @@ func ReAct(opts ...option) *react {
 			OutputFields: make(map[string]*Field),
 		},
 	}
-	for i := 0; i < len(opts); i++ {
+	for i := range opts {
 		opts[i](p)
 	}
 	if p.model == nil {
@@ -73,7 +75,7 @@ func (rp *react) WithTools(tools ...string) *react {
 	})
 	instruction := rp.Instruction
 	toolString := ""
-	for i := 0; i < len(messageTools); i++ {
+	for i := range messageTools {
 		toolString += strconv.Itoa(i+1) + ". "
 		toolString += messageTools[i].Function.Name + ":" + messageTools[i].Function.Description
 		rawArgs, _ := json.Marshal(messageTools[i].Function.Parameters)
@@ -99,8 +101,8 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 	value.p = rp.predictor
 
 	thoughts := []map[string]any{}
-	for i := 0; i < 50; i++ {
-		result, err := rp.invoke(ctx, inputs, thoughts)
+	for range MaxIterationNum {
+		result, err := rp.plan(ctx, inputs, thoughts)
 		if err != nil {
 			continue
 		}
@@ -114,6 +116,15 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 					"tool_result": "finished",
 				})
 				break
+			} else if result.Tool.Name == "reflect" {
+				if len(thoughts) > 0 {
+					thoughts = append(thoughts, map[string]any{
+						"thought":     result.Thoughts.Text,
+						"tool_name":   result.Tool.Name,
+						"tool_args":   result.Tool.Args,
+						"tool_result": "finished",
+					})
+				}
 			} else {
 				// TODO check function name valid?
 				toolResult, err := tool.Spawn(result.Tool.Name).Invoke(ctx, result.Tool.Args)
@@ -153,7 +164,7 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 	return &value
 }
 
-func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []map[string]any) (*ReactResult, error) {
+func (rp *react) plan(ctx context.Context, inputs map[string]any, thoughts []map[string]any) (*ReactResult, error) {
 	var result ReactResult
 	messages, err := rp.adapter.Format(rp.predictor, inputs, nil)
 	if err != nil {
@@ -161,7 +172,7 @@ func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []m
 	}
 	if len(thoughts) > 0 {
 		messages = append(messages, llm.AssistantPromptMessage(rp.renderThoughts(thoughts)))
-		messages = append(messages, llm.UserTextPromptMessage("Determine next step to do(tool use or output), and respond using the format specified in above."))
+		messages = append(messages, llm.UserTextPromptMessage("Determine next step to do(tool use or answer), and respond using the format specified in above."))
 	}
 	response, err := rp.model.Invoke(ctx, messages,
 		llm.WithStream(true),
@@ -179,7 +190,7 @@ func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []m
 		return nil, err
 	}
 	if result.Thoughts == nil {
-		log.WarnContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, err)
+		log.WarnContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, "thoughts is nil")
 		return nil, fmt.Errorf("no result")
 	}
 	log.InfoContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, err)

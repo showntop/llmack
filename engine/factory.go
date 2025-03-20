@@ -44,6 +44,7 @@ type Options struct {
 	Memory         Memory
 	ConversationID int64
 	MessageID      int64
+	Reflect        int64
 	Hooks          []Hook
 }
 
