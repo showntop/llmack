@@ -26,7 +26,7 @@ func main() {
 	settings.LLMModel.Provider = openaic.Name
 	settings.LLMModel.Name = "hunyuan-turbo"
 	eng := engine.NewChatEngine(settings, engine.WithLogger(&log.WrapLogger{}))
-	esm := eng.Stream(context.Background(), engine.Input{
+	esm := eng.Execute(context.Background(), engine.Input{
 		Query: "你好",
 	})
 	for evt := esm.Next(); evt != nil; evt = esm.Next() {

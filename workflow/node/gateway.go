@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/expr-lang/expr"
 	wf "github.com/showntop/llmack/workflow"
 )
 
@@ -12,20 +13,20 @@ type (
 	exclGateway struct {
 		executeable
 		Identifier
-		outging []wf.Edge
+		outging []*wf.Edge
 	}
 
 	// forkGateway is an fork gateway that can return all branch
 	forkGateway struct {
 		executeable
 		Identifier
-		outging []wf.Edge
+		outging []*wf.Edge
 	}
 )
 
 // ExclGateway fn initializes exclusive gateway
 // func ExclGateway(pp ...*GatewayCondition) (*exclGateway, error) {
-func ExclGateway(node *wf.Node, outgoing ...wf.Edge) (*exclGateway, error) {
+func ExclGateway(node *wf.Node, outgoing ...*wf.Edge) (*exclGateway, error) {
 	t := len(outgoing)
 	if t < 2 {
 		return nil, fmt.Errorf("expecting at least two branches for exclusive gateway")
@@ -44,49 +45,38 @@ func GatewayActivity(ctx context.Context, n *exclGateway, r *ExecRequest) (ExecR
 	return n.Execute(ctx, r)
 }
 
-// Begin TODO
-// func (gw *exclGateway) Begin(ctx workflow.Context, r *ExecRequest) (ExecResponse, error) {
-// 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{StartToCloseTimeout: 1 * time.Second})
-// 	var result ExecResponse
-// 	err := workflow.ExecuteLocalActivity(ctx, GatewayActivity, n, r).Get(ctx, &result)
-// 	return result, err
-// }
-
 // Exec fn on exclGateway uses current scope to test all configured conditions
 //
 // Exactly one matched path can be returned.
 func (gw exclGateway) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, error) {
 	test := func(ctx context.Context, vars map[string]any, express string) (bool, error) {
-		// out, err := expr.Eval(express, vars.Dict())
-		// if err != nil {
-		// 	return false, err
-		// }
+		out, err := expr.Eval(express, vars)
+		if err != nil {
+			return false, err
+		}
 
-		// return out.(bool), nil
-		return true, nil
+		return out.(bool), nil
 	}
 	_ = test
 	for _, p := range gw.outging {
-		_ = p
-		// expr := p.Expr()
-		// if expr == "" {
-		// 	// empty & last; treat it as else part of the if condition
-		// 	// return r.Graph.NodeByID(p.Target), nil
-		// 	return wf.NodeID(p.Target), nil
-		// }
+		expr := p.Express
+		if expr == "" {
+			// empty & last; treat it as else part of the if condition
+			return wf.NodeID{ID: p.Target}, nil
+		}
 
-		// if result, err := test(ctx, r.Scope, expr); err != nil {
-		// 	return nil, err
-		// } else if result {
-		// 	return wf.NodeID(p.Target), nil
-		// }
+		if result, err := test(ctx, r.Inputs, expr); err != nil {
+			return nil, err
+		} else if result {
+			return wf.NodeID{ID: p.Target}, nil
+		}
 	}
 
 	return nil, fmt.Errorf("exclusive gateway must match one condition")
 }
 
 // ForkGateway fn initializes fork gateway
-func ForkGateway(node *wf.Node, outgoing ...wf.Edge) (*forkGateway, error) {
+func ForkGateway(node *wf.Node, outgoing ...*wf.Edge) (*forkGateway, error) {
 	t := len(outgoing)
 	if t < 2 {
 		return nil, fmt.Errorf("expecting at least two branches for fork gateway")
@@ -104,14 +94,6 @@ func (gw forkGateway) Kind() wf.NodeKind {
 func ForkGatewayActivity(ctx context.Context, n *forkGateway, r *ExecRequest) (ExecResponse, error) {
 	return n.Execute(ctx, r)
 }
-
-// Begin TODO
-// func (gw *forkGateway) Begin(ctx workflow.Context, r *ExecRequest) (ExecResponse, error) {
-// 	ctx = workflow.WithLocalActivityOptions(ctx, workflow.LocalActivityOptions{StartToCloseTimeout: 1 * time.Second})
-// 	var result ExecResponse
-// 	err := workflow.ExecuteLocalActivity(ctx, ForkGatewayActivity, n, r).Get(ctx, &result)
-// 	return result, err
-// }
 
 // Exec fn on forkGateway uses current scope to test all configured conditions
 //

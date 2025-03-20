@@ -42,10 +42,13 @@ func (resp *Response) Result() *Result {
 	resp.result = &Result{}
 	// 合并 message
 	text := ""
+	text2 := ""
 	for it := resp.stream.Next(); it != nil; it = resp.stream.Next() {
 		text += it.Delta.Message.content
+		text2 += it.Delta.Message.ReasoningContent
 	}
 	message := AssistantPromptMessage(text)
+	message.ReasoningContent = text2
 	resp.result.Message = message
 	return resp.result
 }
@@ -84,8 +87,9 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 		Choices []struct {
 			Index int `json:"index"`
 			Delta struct {
-				ReasoningContent string `json:"reasoning_content"`
-				Content          string `json:"content"`
+				ReasoningContent string      `json:"reasoning_content"`
+				Content          string      `json:"content"`
+				ToolCalls        []*ToolCall `json:"tool_calls"`
 			} `json:"delta"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -107,8 +111,12 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 	// chunk.SystemFingerprint = mmm.SystemFingerprint
 	chunk.Delta = &ChunkDelta{}
 	chunk.Delta.Index = 0
+
 	if mmm.Choices[0].Delta.ReasoningContent != "" {
 		chunk.Delta.Message = AssistantReasoningMessage(mmm.Choices[0].Delta.ReasoningContent)
+	} else if len(mmm.Choices[0].Delta.ToolCalls) > 0 {
+		chunk.Delta.Message = AssistantPromptMessage(mmm.Choices[0].Delta.Content)
+		chunk.Delta.Message.ToolCalls = mmm.Choices[0].Delta.ToolCalls
 	} else {
 		chunk.Delta.Message = AssistantPromptMessage(mmm.Choices[0].Delta.Content)
 	}
@@ -141,8 +149,9 @@ type Chunk struct {
 // ChunkDelta ...
 type ChunkDelta struct {
 	Index        int                     `json:"index"`
-	Message      *assistantPromptMessage `json:"message"`
 	FinishReason string                  `json:"finish_reason"`
+	Logprobs     any                     `json:"logprobs"`
+	Message      *assistantPromptMessage `json:"message"`
 }
 
 // Usage ...

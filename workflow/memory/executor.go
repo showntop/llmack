@@ -3,13 +3,17 @@ package memory
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
-	"golang.org/x/sync/errgroup"
-
+	"github.com/expr-lang/expr"
+	"github.com/showntop/flatmap"
+	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/workflow"
 	nodePkg "github.com/showntop/llmack/workflow/node"
+	"golang.org/x/sync/errgroup"
 )
 
 // Executor 工作流执行器
@@ -50,13 +54,14 @@ func (e *Executor) Execute(ctx context.Context, inputs map[string]any) (*workflo
 	levelExecute := func(currents []*workflow.Node) ([]*workflow.Node, error) {
 		var nexts []*workflow.Node
 		var err error
-		errGroup, ctx := errgroup.WithContext(ctx)
+		errGroup := errgroup.Group{}
 		for _, node := range currents {
 			errGroup.Go(func() error {
-				nexts, err = e.executeNode(ctx, node, e.scope)
+
+				nexts, err = e.executeNode(ctx, node, graph.edges[node.ID]...)
 				if err != nil {
-					log.ErrorContextf(ctx, "workflow execute node(id: %s, kind:%s) failed: %v", node.ID, node.Kind, err)
-					return err
+					log.ErrorContextf(ctx, "workflow execute node(id: %s, kind:%s) error, %v", node.ID, node.Kind, err)
+					return nil
 				}
 				return nil
 			})
@@ -81,8 +86,8 @@ func (e *Executor) Execute(ctx context.Context, inputs map[string]any) (*workflo
 		queue = append(queue, nexts...) // 将下一层节点加入队列
 	}
 
-	// 关闭流
-	close(e.events)
+	// 关闭流 @TODO fix it on 恰当位置
+	// close(e.events)
 	log.InfoContextf(ctx, "workflow execute workflow %v, finished with outputs: %+v", e.workflow.ID, e.outputs)
 	return &workflow.Result{
 		Outputs: e.outputs,
@@ -90,18 +95,41 @@ func (e *Executor) Execute(ctx context.Context, inputs map[string]any) (*workflo
 }
 
 // executeNode 执行单个节点
-func (e *Executor) executeNode(ctx context.Context, node *workflow.Node, inputs map[string]any) ([]*workflow.Node, error) {
+func (e *Executor) executeNode(ctx context.Context, node *workflow.Node, outgoings ...*workflow.Edge) ([]*workflow.Node, error) {
 	// 检查节点的所有前置依赖是否已完成
 	// if !graph.AreAllDependenciesCompleted(node.ID) {
 	// 	return nil, nil
 	// }
-	nodeIns, err := nodePkg.Build(node)
+
+	nodeIns, err := nodePkg.Build(node, outgoings...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build node %s: %w", node.ID, err)
 	}
+	inputs := make(map[string]any)
+	if len(node.Inputs) > 0 {
+		env, err := flatmap.Flatten(e.scope, flatmap.DefaultTokenizer)
+		if err != nil {
+			return nil, errors.Join(err)
+		}
+
+		for name, input := range node.Inputs {
+			if !strings.HasPrefix(input.Value, "{{") { // expression
+				program, _ := expr.Compile(input.Value)
+				value, _ := expr.Run(program, nil)
+				inputs[name] = value
+				continue
+			}
+			pointer := strings.TrimPrefix(input.Value, "{{")
+			pointer = strings.TrimSuffix(pointer, "}}")
+			value := env.Get(pointer)
+			inputs[name] = value
+		}
+	} else {
+		inputs = e.scope
+	}
 	jsonInputs, _ := json.Marshal(inputs)
 	jsonScope, _ := json.Marshal(e.scope)
-	log.InfoContextf(ctx, "workflow execute node(id: %s, kind:%s) inputs: %s, scope: %s", node.ID, node.Kind, string(jsonInputs), string(jsonScope))
+	log.InfoContextf(ctx, "workflow execute node(id: %s, kind:%s) <====> inputs: %s, scope: %s", node.ID, node.Kind, string(jsonInputs), string(jsonScope))
 	result, err := nodeIns.Execute(ctx, &nodePkg.ExecRequest{
 		Inputs: inputs,
 		Scope:  e.scope,
@@ -112,13 +140,21 @@ func (e *Executor) executeNode(ctx context.Context, node *workflow.Node, inputs 
 		return nil, fmt.Errorf("failed to execute node %s: %w", node.ID, err)
 	}
 	jsonResult, _ := json.Marshal(result)
-	log.InfoContextf(ctx, "workflow execute node(id: %s, kind:%s) outputs: %T %s", node.ID, node.Kind, result, string(jsonResult))
+	log.InfoContextf(ctx, "workflow execute node(id: %s, kind:%s) <====> outputs: %T %s", node.ID, node.Kind, result, string(jsonResult))
 
 	nexts := []*workflow.Node{}
 	switch result := result.(type) {
 	case map[string]any:
 		e.scope[node.ID] = result // 更新节点结果
 		e.outputs = result        // 重置outputs，TODO 注意并行下的bug，需要改得更优雅一些
+	case *llm.Response:
+		e.scope[node.ID] = map[string]any{"response": result}
+		// e.outputs = result
+	case *llm.Result:
+		e.scope[node.ID] = map[string]any{"response": result}
+		// e.outputs = result
+	case workflow.NodeID:
+		nexts = []*workflow.Node{e.graph.nodes[result.ID]}
 	case error:
 		return nil, result
 	}

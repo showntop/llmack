@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/showntop/llmack/workflow"
-	"github.com/showntop/llmack/workflow/dag"
 )
 
 // Identifier TODO
@@ -40,8 +39,8 @@ type ExecRequest struct {
 	Runner     string // 运行人
 	Inputs     map[string]any
 	Scope      map[string]any
-	Graph      *dag.Graph
-	Events     chan *workflow.Event
+	// Graph      *dag.Graph
+	Events chan *workflow.Event
 }
 
 type ExecResponse any

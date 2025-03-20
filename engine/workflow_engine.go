@@ -19,23 +19,8 @@ func NewWorkflowEngine(settings *Settings, opts ...Option) *WorkflowEngine {
 	return engine
 }
 
-// Invoke ... return channel， 不支持streaming
-func (engine *WorkflowEngine) Invoke(ctx context.Context, input Input) (any, error) {
-
-	inputs := input.Inputs
-	// query := input.Query
-	// 调用 工具
-	// new workflow exeutor
-	excutor := memory.NewExecutor(engine.Settings.Workflow)
-	result, err := excutor.Execute(ctx, inputs)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-// Stream ... return channel， 不支持streaming
-func (engine *WorkflowEngine) Stream(ctx context.Context, input Input) *EventStream {
+// Execute ... return channel， 不支持streaming
+func (engine *WorkflowEngine) Execute(ctx context.Context, input Input) *EventStream {
 	resultChan := NewEventStream()
 	if input.Inputs == nil {
 		input.Inputs = make(map[string]any)

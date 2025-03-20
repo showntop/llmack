@@ -11,10 +11,10 @@ type Graph struct {
 	queue []string // 用于存储待执行的节点
 
 	nodes     map[string]*workflow.Node
-	edges     map[string][]string // sourceID -> []targetID
-	completed map[string]bool     // 记录节点完成状态
-	inDegree  map[string]int      // 记录节点入度
-	mu        sync.RWMutex        // 保护并发访问
+	edges     map[string][]*workflow.Edge // sourceID -> []targetID
+	completed map[string]bool             // 记录节点完成状态
+	inDegree  map[string]int              // 记录节点入度
+	mu        sync.RWMutex                // 保护并发访问
 }
 
 // StartNodes 获取所有入度为0的起始节点
@@ -68,11 +68,11 @@ func (g *Graph) AreAllDependenciesCompleted(nodeID string) bool {
 	defer g.mu.RUnlock()
 
 	// 遍历所有边，找到指向当前节点的边的源节点
-	for sourceID, targets := range g.edges {
-		for _, targetID := range targets {
-			if targetID == nodeID {
+	for source, edges := range g.edges {
+		for _, target := range edges {
+			if target.Target == nodeID {
 				// 如果有任何一个前置节点未完成，返回false
-				if !g.completed[sourceID] {
+				if !g.completed[source] {
 					return false
 				}
 			}
@@ -94,9 +94,9 @@ func (g *Graph) NextNodes(nodeID string) []*workflow.Node {
 	defer g.mu.RUnlock()
 
 	var nextNodes []*workflow.Node
-	if targets, exists := g.edges[nodeID]; exists {
-		for _, targetID := range targets {
-			if node, exists := g.nodes[targetID]; exists {
+	if edges, exists := g.edges[nodeID]; exists {
+		for _, edge := range edges {
+			if node, exists := g.nodes[edge.Target]; exists {
 				nextNodes = append(nextNodes, node)
 			}
 		}
@@ -108,7 +108,7 @@ func (g *Graph) NextNodes(nodeID string) []*workflow.Node {
 func NewGraph(nodes []workflow.Node, edges []workflow.Edge) *Graph {
 	g := &Graph{
 		nodes:     make(map[string]*workflow.Node),
-		edges:     make(map[string][]string),
+		edges:     make(map[string][]*workflow.Edge),
 		completed: make(map[string]bool),
 		inDegree:  make(map[string]int),
 	}
@@ -120,7 +120,7 @@ func NewGraph(nodes []workflow.Node, edges []workflow.Edge) *Graph {
 	}
 
 	for _, edge := range edges {
-		g.edges[edge.Source] = append(g.edges[edge.Source], edge.Target)
+		g.edges[edge.Source] = append(g.edges[edge.Source], &edge)
 		g.inDegree[edge.Target]++
 	}
 

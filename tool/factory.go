@@ -1,10 +1,8 @@
 package tool
 
-import "context"
-
 // Repo 工具仓库
 type Repo interface {
-	FetchAPITool(context.Context, int64, string) (*APIToolBundle, error)
+	// FetchTool(context.Context, int64, string) (*Metadata, error)
 }
 
 // Factory 工具工厂
@@ -17,18 +15,12 @@ func NewFactory(repo Repo) *Factory {
 	return &Factory{repo: repo}
 }
 
-// Instantiate ...
-func (f *Factory) Instantiate(providerID int64, providerKind string, name string) Tool {
-	if providerKind == "api" {
-		bundle, err := f.repo.FetchAPITool(context.TODO(), providerID, name)
-		if err != nil {
-			return &NilTool{Target: name}
-		}
-		return NewAPITool(*bundle)
-	} else if providerKind == "code" {
-		return NewCodeTool(name)
+// Spawn ...
+func (f *Factory) Spawn(name string) *Tool {
+	if t, ok := tools[name]; ok {
+		return t
 	}
-	return &NilTool{Target: name}
+	return nil
 }
 
 var defaultFactory = NewFactory(nil)
@@ -38,7 +30,19 @@ func WithRepo(repo Repo) {
 	defaultFactory.repo = repo
 }
 
-// Instantiate ...
-func Instantiate(providerID int64, providerKind string, name string) Tool {
-	return defaultFactory.Instantiate(providerID, providerKind, name)
+// Spawn ...
+func Spawn(name string) *Tool {
+	x := defaultFactory.Spawn(name)
+	if x == nil {
+		return NilTool
+	}
+	return x
+}
+
+// Tools 工具注册表
+var tools map[string]*Tool = make(map[string]*Tool)
+
+// Register 注册工具
+func Register(t *Tool) {
+	tools[t.Name] = t
 }
