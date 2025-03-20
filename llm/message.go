@@ -57,7 +57,6 @@ func (m PromptMessage) MarshalJSON() ([]byte, error) {
 	if m.content != "" {
 		return []byte(fmt.Sprintf(`{"role":"%s","content":"%s"}`, m.role, m.content)), nil
 	}
-	panic("implement it")
 	return nil, nil
 }
 

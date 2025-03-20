@@ -118,7 +118,7 @@ func (o *OAILLM) handleStreamResponse(ctx context.Context, body io.ReadCloser) (
 				continue
 			}
 
-			chunk, err := BuildChunkMessage(line) // TODO Unmarshal line
+			chunk, err := buildChunkMessage(line) // TODO Unmarshal line
 			if err != nil {
 				continue
 			}
