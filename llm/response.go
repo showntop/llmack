@@ -122,9 +122,15 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 	}
 	chunk.Delta.FinishReason = mmm.Choices[0].FinishReason
 
-	// chunk.Choices = []*ChunkDelta{
-	// 	{Index: 0, Message: chunk.Delta.Message, FinishReason: mmm.Choices[0].FinishReason},
-	// }
+	choices := []*ChunkDelta{}
+	for i := 0; i < len(mmm.Choices); i++ {
+		choices = append(choices, &ChunkDelta{
+			Index:        i,
+			Message:      chunk.Delta.Message,
+			FinishReason: mmm.Choices[i].FinishReason,
+		})
+	}
+	chunk.Choices = choices
 	return chunk, nil
 }
 
@@ -137,7 +143,7 @@ type Chunk struct {
 	SystemFingerprint string        `json:"system_fingerprint"`
 	Choices           []*ChunkDelta `json:"choices"`
 	Usage             *Usage        `json:"usage"`
-	Delta             *ChunkDelta   `json:"delta"`
+	Delta             *ChunkDelta   `json:"-"`
 }
 
 // ChunkDelta ...

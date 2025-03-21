@@ -65,8 +65,6 @@ func (m PromptMessage) MarshalJSON() ([]byte, error) {
 	} else if m.role == PromptMessageRoleUser {
 		panic(fmt.Sprintf("user prompt message should not be marshal to json: %v", m))
 	}
-
-	panic("implement it")
 	return nil, nil
 }
 
