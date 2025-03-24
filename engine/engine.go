@@ -123,7 +123,7 @@ func (r *BotEngine) RenderMessages(ctx context.Context, preset string,
 	if r.opts.Memory != nil {
 		histories := r.FetchHistoryMessages(ctx)
 		// messages 反转
-		for i := 0; i < len(histories); i++ {
+		for i := range histories {
 			messages = append(messages, histories[len(histories)-1-i])
 		}
 	}
