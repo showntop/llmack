@@ -95,7 +95,7 @@ func (mi *Instance) Invoke(ctx context.Context,
 	}
 	if mi.opts != nil && mi.opts.hooks != nil {
 		for _, hook := range mi.opts.hooks {
-			hook.OnBeforeInvoke(ctx)
+			ctx = hook.OnBeforeInvoke(ctx)
 		}
 	}
 
