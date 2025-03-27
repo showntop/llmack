@@ -17,6 +17,7 @@ type Hook interface {
 	OnBeforeInvoke(context.Context) context.Context
 	OnAfterInvoke(ctx context.Context, err error)
 	OnFirstChunk(context.Context, error) context.Context
+	OnLastChunk(context.Context, error)
 }
 
 // OtelHook ...
@@ -39,7 +40,22 @@ func NewOtelHook(opts ...HookOption) Hook {
 
 // OnFirstChunk ...
 func (h *OtelHook) OnFirstChunk(ctx context.Context, _ error) context.Context {
+	ctx, _ = h.tracer.Start(ctx, "llm/response", trace.WithSpanKind(trace.SpanKindInternal))
+
 	return ctx
+}
+
+// OnLastChunk ...
+func (h *OtelHook) OnLastChunk(ctx context.Context, err error) {
+	span := trace.SpanFromContext(ctx)
+	if !span.IsRecording() {
+		return
+	}
+	defer span.End()
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
 }
 
 // OnBeforeInvoke ...

@@ -194,7 +194,7 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 		for chunk := response.stream.Next(); chunk != nil; chunk = response.stream.Next() {
 			if firstChunk {
 				for _, hook := range mi.opts.hooks {
-					hook.OnFirstChunk(ctx, nil)
+					ctx = hook.OnFirstChunk(ctx, nil)
 				}
 			}
 			firstChunk = false
@@ -207,7 +207,9 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 		if updateCache != nil {
 			updateCache(ctx, result)
 		}
-
+		for _, hook := range mi.opts.hooks {
+			hook.OnLastChunk(ctx, nil)
+		}
 	}()
 	return newResp
 }
