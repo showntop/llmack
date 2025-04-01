@@ -151,7 +151,7 @@ type ChunkDelta struct {
 	Index        int                     `json:"index"`
 	FinishReason string                  `json:"finish_reason"`
 	Logprobs     any                     `json:"logprobs"`
-	Message      *assistantPromptMessage `json:"message"`
+	Message      *assistantPromptMessage `json:"delta"`
 }
 
 // Usage ...
