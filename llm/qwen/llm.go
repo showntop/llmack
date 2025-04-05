@@ -26,7 +26,7 @@ type LLM struct {
 var initOnce sync.Once
 
 // Invoke TODO
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, optFuncs ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.InvokeOptions) (*llm.Response, error) {
 	var err error
 	m.once.Do(func() {
 		url := "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
@@ -40,5 +40,5 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, optFuncs ...ll
 	if err != nil {
 		return nil, err
 	}
-	return m.engine.Invoke(ctx, messages, optFuncs...)
+	return m.engine.Invoke(ctx, messages, opts)
 }

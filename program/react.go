@@ -48,7 +48,7 @@ func ReAct(opts ...option) *react {
 			OutputFields: make(map[string]*Field),
 		},
 	}
-	for i := 0; i < len(opts); i++ {
+	for i := range opts {
 		opts[i](p)
 	}
 	if p.model == nil {
@@ -58,7 +58,13 @@ func ReAct(opts ...option) *react {
 	return react
 }
 
-func (rp *react) WithTools(tools ...string) *react {
+func (rp *react) WithActions(actions ...any) *react {
+	var tools []string
+	for _, action := range actions {
+		if action, ok := action.(string); ok {
+			tools = append(tools, action)
+		}
+	}
 	messageTools := rp.renderTools(tools...)
 	messageTools = append(messageTools, &llm.Tool{
 		Type: "function",
@@ -73,7 +79,7 @@ func (rp *react) WithTools(tools ...string) *react {
 	})
 	instruction := rp.Instruction
 	toolString := ""
-	for i := 0; i < len(messageTools); i++ {
+	for i := range messageTools {
 		toolString += strconv.Itoa(i+1) + ". "
 		toolString += messageTools[i].Function.Name + ":" + messageTools[i].Function.Description
 		rawArgs, _ := json.Marshal(messageTools[i].Function.Parameters)

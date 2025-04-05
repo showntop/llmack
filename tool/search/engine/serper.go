@@ -14,6 +14,9 @@ import (
 
 // NewSerper 创建serper
 func NewSerper(apiKey string, kind string) Searcher {
+	if kind == "" {
+		kind = "search"
+	}
 	return &Serper{apiKey: apiKey, kind: kind}
 }
 
@@ -29,8 +32,7 @@ func (s *Serper) Search(ctx context.Context, query string) ([]*Result, error) {
 	url := "https://google.serper.dev/" + s.kind
 	method := "POST"
 
-	payload := strings.NewReader(fmt.Sprintf(`{"q":"%s -youtube","gl":"cn"}`, query))
-
+	payload := strings.NewReader(fmt.Sprintf(`{"q":"%s -youtube","gl":"cn"}`, strings.ReplaceAll(query, `"`, `\"`)))
 	req, err := http.NewRequest(method, url, payload)
 
 	if err != nil {

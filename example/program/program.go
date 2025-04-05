@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 
 	"github.com/joho/godotenv"
 	"github.com/showntop/llmack/llm"
@@ -23,11 +24,16 @@ func init() {
 }
 
 func main() {
-	var target any
+	var target struct {
+		Out1 string `json:"out1"`
+		Out2 bool   `json:"out2"`
+	}
 	err := program.COT().
+		WithAdapter(&program.MarkableAdapter{}).
 		WithInstruction("hello？").
 		WithInputField("hello", "world").
-		WithOutputField("hello", "world").
+		WithOutputField("out1", "description", "marker", reflect.String).
+		WithOutputField("out2", "description", "marker", reflect.Bool).
 		Result(context.Background(), &target)
 	if err != nil {
 		panic(err)

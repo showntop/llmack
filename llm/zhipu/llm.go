@@ -25,15 +25,11 @@ type LLM struct {
 }
 
 // Invoke TODO
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.InvokeOptions) (*llm.Response, error) {
 	response := llm.NewStreamResponse()
 
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
-	}
-	var opts llm.InvokeOptions
-	for _, o := range options {
-		o(&opts)
 	}
 
 	internalMessages := []zhipu.ChatCompletionMessageType{}

@@ -25,7 +25,7 @@ type InvokeOptions struct {
 	StreamOptions *StreamOptions `json:"stream_options,omitempty"`
 
 	// Model is the model to use.
-	Model string `json:"model"`
+	Model string `json:"model,omitempty"`
 	// Stream is the stream output.
 	Stream bool `json:"stream,omitempty"`
 	// CandidateCount is the number of response candidates to generate.
@@ -143,6 +143,49 @@ const (
 
 // InvokeOption is a function that configures a InvokeOptions.
 type InvokeOption func(*InvokeOptions)
+
+// // WithSuperParams specifies the super params for the model.
+// func WithSuperParams(o1 *InvokeOptions) InvokeOption {
+// 	return func(o *InvokeOptions) {
+// 		o.Temperature = o1.Temperature
+// 		o.MaxTokens = o1.MaxTokens
+// 		o.TopP = o1.TopP
+// 		o.TopK = o1.TopK
+// 		o.FrequencyPenalty = o1.FrequencyPenalty
+// 		o.PresencePenalty = o1.PresencePenalty
+// 		o.RepetitionPenalty = o1.RepetitionPenalty
+// 	}
+// }
+
+func WithTemperature(temperature float64) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.Temperature = temperature
+	}
+}
+
+func WithMaxTokens(maxTokens int) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.MaxTokens = maxTokens
+	}
+}
+
+func WithTopP(topP float64) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.TopP = topP
+	}
+}
+
+func WithTopK(topK int) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.TopK = topK
+	}
+}
+
+func WithFrequencyPenalty(frequencyPenalty float64) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.FrequencyPenalty = frequencyPenalty
+	}
+}
 
 // WithModel specifies which model name to use.
 func WithModel(model string) InvokeOption {

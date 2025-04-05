@@ -5,23 +5,38 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/showntop/llmack/llm"
+	"github.com/showntop/llmack/prompt"
 )
 
-// Adapter ...
-type Adapter interface {
+type InputAdapter interface {
 	Format(p *predictor, inputs map[string]any, target any) ([]llm.Message, error)
+}
+
+type OutputAdapter interface {
 	Parse(string, any) error
 }
 
-// MarkableAdapter ...
+// Adapter ...
+type Adapter interface {
+	InputAdapter
+	OutputAdapter
+}
+
 type MarkableAdapter struct {
+	MarkableInputAdapter
+	MarkableOutputAdapter
+}
+
+// MarkableInputAdapter ...
+type MarkableInputAdapter struct {
 }
 
 // Format ...
-func (ada *MarkableAdapter) Format(p *predictor, inputs map[string]any) ([]llm.Message, error) {
+func (ada *MarkableInputAdapter) Format(p *predictor, inputs map[string]any, _ any) ([]llm.Message, error) {
 	sysPromptBuilder := strings.Builder{}
 	sysPromptBuilder.WriteString("Your input fields are:\n")
 	for name, field := range p.InputFields {
@@ -95,8 +110,12 @@ func (ada *MarkableAdapter) Format(p *predictor, inputs map[string]any) ([]llm.M
 	return messages, nil
 }
 
+type MarkableOutputAdapter struct {
+}
+
 // Parse ...
-func (ada *MarkableAdapter) Parse(completion string) map[string]any {
+func (ada *MarkableOutputAdapter) Parse(completion string, object any) error {
+	fmt.Println(completion)
 	fieldHeaderPattern := regexp.MustCompile(`\[\[ ## (\w+) ## \]\]`) // Replace with the actual regex pattern
 
 	sections := make([][2]string, 1)
@@ -109,12 +128,57 @@ func (ada *MarkableAdapter) Parse(completion string) map[string]any {
 		}
 	}
 	// 处理 object
-	object := make(map[string]any)
+	objectValue := reflect.ValueOf(object).Elem()
 	for i := range sections {
-		object[sections[i][0]] = sections[i][1]
+		fieldType := objectValue.FieldByName(sections[i][0])
+		fmt.Println(sections[i][0], fieldType.Kind())
+		if fieldType.Kind() == reflect.String {
+			fieldType.SetString(sections[i][1])
+		} else if fieldType.Kind() == reflect.Slice {
+			fieldType.Set(reflect.MakeSlice(fieldType.Type(), 0, 0))
+			fieldType.Set(reflect.Append(fieldType, reflect.ValueOf(sections[i][1])))
+		} else if fieldType.Kind() == reflect.Map {
+			fieldType.Set(reflect.MakeMap(fieldType.Type()))
+		} else if fieldType.Kind() == reflect.Struct {
+			return fmt.Errorf("unsupported field type: %s", fieldType.Kind())
+		} else if fieldType.Kind() == reflect.Bool {
+			fieldType.SetBool(sections[i][1] == "true")
+		} else if fieldType.Kind() == reflect.Int {
+			num, err := strconv.Atoi(sections[i][1])
+			if err != nil {
+				return fmt.Errorf("failed to convert %s to int: %w", sections[i][1], err)
+			}
+			fieldType.SetInt(int64(num))
+		} else if fieldType.Kind() == reflect.Float64 {
+			num, err := strconv.ParseFloat(sections[i][1], 64)
+			if err != nil {
+				return fmt.Errorf("failed to convert %s to float64: %w", sections[i][1], err)
+			}
+			fieldType.SetFloat(num)
+		} else if fieldType.Kind() == reflect.Int64 {
+			num, err := strconv.ParseInt(sections[i][1], 10, 64)
+			if err != nil {
+				return fmt.Errorf("failed to convert %s to int64: %w", sections[i][1], err)
+			}
+			fieldType.SetInt(num)
+		} else if fieldType.Kind() == reflect.Uint64 {
+			num, err := strconv.ParseUint(sections[i][1], 10, 64)
+			if err != nil {
+				return fmt.Errorf("failed to convert %s to uint64: %w", sections[i][1], err)
+			}
+			fieldType.SetUint(num)
+		} else if fieldType.Kind() == reflect.Float32 {
+			num, err := strconv.ParseFloat(sections[i][1], 32)
+			if err != nil {
+				return fmt.Errorf("failed to convert %s to float32: %w", sections[i][1], err)
+			}
+			fieldType.SetFloat(float64(num))
+		} else {
+			return fmt.Errorf("unsupported field type: %s", fieldType.Kind())
+		}
 	}
 
-	return object
+	return nil
 }
 
 // JSONAdapter ...
@@ -244,4 +308,46 @@ func (ada *JSONAdapter) Parse(completion string, target any) error {
 	completion = strings.TrimSuffix(completion, "```")
 	// json to target
 	return json.Unmarshal([]byte(completion), &target)
+}
+
+// RawAdapter ...
+type RawAdapter struct {
+	RawInputAdapter
+	RawOutputAdapter
+}
+
+type RawInputAdapter struct {
+}
+
+type RawOutputAdapter struct {
+}
+
+// Format ...
+func (ada *RawInputAdapter) Format(p *predictor, inputs map[string]any, _ any) ([]llm.Message, error) {
+	var err error
+	p.Instruction, err = prompt.Render(p.Instruction, inputs)
+	if err != nil {
+		return nil, err
+	}
+	// @TODO handle error
+	userPromptBuilder := strings.Builder{}
+	userPromptBuilder.WriteString(p.Instruction)
+	userPromptBuilder.WriteByte('\n')
+
+	messages := []llm.Message{
+		llm.UserTextPromptMessage(userPromptBuilder.String()),
+	}
+	return messages, nil
+}
+
+// Parse ...
+func (ada *RawOutputAdapter) Parse(completion string, target any) error {
+	// 给 target 赋值为 completion
+	reflect.ValueOf(target).Elem().SetString(completion)
+	return nil
+}
+
+type DefaultAdapter struct {
+	RawInputAdapter
+	MarkableOutputAdapter
 }

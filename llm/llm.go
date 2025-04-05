@@ -14,7 +14,7 @@ type logger interface {
 
 // Provider ...
 type Provider interface {
-	Invoke(context.Context, []Message, ...InvokeOption) (*Response, error)
+	Invoke(context.Context, []Message, *InvokeOptions) (*Response, error)
 }
 
 // Instance ...
@@ -37,10 +37,18 @@ type Options struct {
 	cache  Cache
 	logger logger
 	model  string
+	*InvokeOptions
 }
 
 // Option ...
 type Option func(*Options)
+
+// WithInvokeOptions ...
+func WithInvokeOptions(o *InvokeOptions) Option {
+	return func(options *Options) {
+		options.InvokeOptions = o
+	}
+}
 
 // WithHook ...
 func WithHook(hooks ...Hook) Option {
@@ -122,12 +130,15 @@ func (mi *Instance) invoke(ctx context.Context,
 
 	updateCache := func(ctx context.Context, result string) {} // nothing todo
 
-	var invokeOpts InvokeOptions
-	for i := 0; i < len(options); i++ {
+	invokeOpts := mi.opts.InvokeOptions
+	if invokeOpts == nil {
+		invokeOpts = &InvokeOptions{}
+	}
+	for i := range options {
 		if options[i] == nil {
 			continue
 		}
-		options[i](&invokeOpts)
+		options[i](invokeOpts)
 	}
 
 	if mi.opts.cache != nil && len(invokeOpts.Tools) <= 0 { // fetch from cache
@@ -152,10 +163,10 @@ func (mi *Instance) invoke(ctx context.Context,
 	}
 
 	if invokeOpts.Model == "" {
-		options = append(options, WithModel(mi.opts.model))
+		invokeOpts.Model = mi.opts.model
 	}
 
-	response, err := mi.provider.Invoke(ctx, messages, options...)
+	response, err := mi.provider.Invoke(ctx, messages, invokeOpts)
 	if err != nil {
 		return response, err
 	}

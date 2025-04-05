@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/sap-nocops/duckduckgogo/client"
 	"github.com/showntop/llmack/tool"
@@ -34,14 +35,13 @@ func registDuckDuckGo() {
 	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
 		query, _ := args["query"].(string)
 		ddg := client.NewDuckDuckGoSearchClient()
-		originResults, err := ddg.SearchLimited(query, 10)
+		originResults, err := ddg.SearchLimited(query, 100)
 		if err != nil {
 			return "", err
 		}
-
 		// crawl detail
 		urls := []string{}
-		for i := 0; i < len(originResults); i++ {
+		for i := range originResults {
 			urls = append(urls, originResults[i].FormattedUrl)
 		}
 		details, err := CrawlWebpage(ctx, urls)
@@ -49,7 +49,7 @@ func registDuckDuckGo() {
 			return "", err
 		}
 		var results []engine.Result = make([]engine.Result, len(originResults))
-		for i := 0; i < len(originResults); i++ {
+		for i := range originResults {
 			results[i].Content = details[i]
 			results[i].Title = originResults[i].Title
 			results[i].Snippet = originResults[i].Snippet
@@ -76,10 +76,13 @@ func registSerper() {
 		Default:       "",
 	})
 	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
-
 		apiKey := tool.DefaultConfig.GetString("serper.api_key")
-		query, _ := args["query"].(string)
-		engine := engine.NewSerper(apiKey, "")
+		query, ok := args["query"].(string)
+		if !ok {
+			return "", errors.New("query is not a string")
+		}
+
+		engine := engine.NewSerper(apiKey, "search")
 		results, err := engine.Search(ctx, query)
 		if err != nil {
 			return "", err
@@ -137,7 +140,7 @@ func registSearxng() {
 			return "", err
 		}
 
-		for i := 0; i < len(results); i++ {
+		for i := range results {
 			results[i].Content = details[i]
 		}
 		bytes, err := json.Marshal(results)

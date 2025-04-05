@@ -27,11 +27,7 @@ func NewOAILLM(url, apiKey string) *OAILLM {
 	}
 }
 
-func (o *OAILLM) Invoke(ctx context.Context, messages []Message, optFuncs ...InvokeOption) (*Response, error) {
-	options := &InvokeOptions{}
-	for i := 0; i < len(optFuncs); i++ {
-		optFuncs[i](options)
-	}
+func (o *OAILLM) Invoke(ctx context.Context, messages []Message, options *InvokeOptions) (*Response, error) {
 	// validate
 	if options.Model == "" {
 		return nil, errors.New("model is required")

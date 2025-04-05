@@ -8,9 +8,10 @@ import (
 
 type option func(*predictor)
 
-func WithLLM(provider string, model string) option {
+func WithLLM(provider string, model string, opts ...llm.Option) option {
 	return func(p *predictor) {
-		p.model = llm.NewInstance(provider, llm.WithDefaultModel(model))
+		opts = append(opts, llm.WithDefaultModel(model))
+		p.model = llm.NewInstance(provider, opts...)
 	}
 }
 
