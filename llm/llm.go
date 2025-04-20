@@ -213,10 +213,10 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 			}
 			firstChunk = false
 			newResp.stream.Push(chunk)
-			if chunk.Choices[0].Message.ReasoningContent != "" {
-				result += chunk.Choices[0].Message.ReasoningContent
+			if chunk.Choices[0].Delta.ReasoningContent != "" {
+				result += chunk.Choices[0].Delta.ReasoningContent
 			}
-			result += chunk.Choices[0].Message.content
+			result += chunk.Choices[0].Delta.content
 		}
 		if updateCache != nil {
 			updateCache(ctx, result)

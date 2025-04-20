@@ -46,7 +46,7 @@ func (resp *Response) Result() *Result {
 	toolcalls := []*ToolCall{}
 	currentTool := &ToolCall{Index: -1}
 	for it := resp.stream.Take(); it != nil; it = resp.stream.Take() {
-		deltaMessage := it.Choices[0].Message
+		deltaMessage := it.Choices[0].Delta
 		text += deltaMessage.content
 		reasoning += deltaMessage.ReasoningContent
 		for _, toolcall := range deltaMessage.ToolCalls {
@@ -88,7 +88,7 @@ func NewChunk(i int, msg *AssistantMessage, useage *Usage) *Chunk {
 		Choices: []*ChunkChoice{
 			{
 				Index:        i,
-				Message:      msg,
+				Delta:        msg,
 				FinishReason: "",
 			},
 		},
@@ -132,12 +132,12 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 	chunk.Choices[0].Index = 0
 
 	if mmm.Choices[0].Delta.ReasoningContent != "" {
-		chunk.Choices[0].Message = NewAssistantReasoningMessage(mmm.Choices[0].Delta.ReasoningContent)
+		chunk.Choices[0].Delta = NewAssistantReasoningMessage(mmm.Choices[0].Delta.ReasoningContent)
 	} else if len(mmm.Choices[0].Delta.ToolCalls) > 0 {
-		chunk.Choices[0].Message = NewAssistantMessage(mmm.Choices[0].Delta.Content)
-		chunk.Choices[0].Message.ToolCalls = mmm.Choices[0].Delta.ToolCalls
+		chunk.Choices[0].Delta = NewAssistantMessage(mmm.Choices[0].Delta.Content)
+		chunk.Choices[0].Delta.ToolCalls = mmm.Choices[0].Delta.ToolCalls
 	} else {
-		chunk.Choices[0].Message = NewAssistantMessage(mmm.Choices[0].Delta.Content)
+		chunk.Choices[0].Delta = NewAssistantMessage(mmm.Choices[0].Delta.Content)
 	}
 	chunk.Choices[0].FinishReason = mmm.Choices[0].FinishReason
 
@@ -145,7 +145,7 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 	for i := 0; i < len(mmm.Choices); i++ {
 		choices = append(choices, &ChunkChoice{
 			Index:        i,
-			Message:      chunk.Choices[0].Message,
+			Delta:        chunk.Choices[0].Delta,
 			FinishReason: mmm.Choices[i].FinishReason,
 		})
 	}
@@ -170,7 +170,7 @@ type ChunkChoice struct {
 	Index        int               `json:"index"`
 	FinishReason string            `json:"finish_reason"`
 	Logprobs     any               `json:"logprobs"`
-	Message      *AssistantMessage `json:"delta"`
+	Delta        *AssistantMessage `json:"delta"`
 }
 
 // Usage ...

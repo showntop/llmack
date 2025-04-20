@@ -60,7 +60,7 @@ func funcallStream() {
 	}
 
 	for chunk := range predictor.Stream() {
-		fmt.Println(chunk.Choices[0].Message.Content())
+		fmt.Println(chunk.Choices[0].Delta.Content())
 	}
 
 }

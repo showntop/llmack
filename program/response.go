@@ -61,7 +61,7 @@ func (r *Response) Get(value any) error {
 }
 
 func (r *Response) Completion() string {
-	return r.completion
+	return r.message.Content()
 }
 
 func (r *Response) ToolCalls() []*llm.ToolCall {

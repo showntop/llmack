@@ -4,35 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/showntop/llmack/agent"
 	"github.com/showntop/llmack/tool/search"
 )
 
 func planAndGenerateReport() {
-	startDate, _ := time.Parse("2006-01-02", "2025-03-25")
-	endDate, _ := time.Parse("2006-01-02", "2025-04-01")
-
-	dataAnalyst := agent.NewAgent(
-		"DataAnalyst",
-		agent.WithModel(model),
-		agent.WithDescription("你是一个数据分析师，擅长从数据中挖掘有价值的信息。"),
-		agent.WithInstructions(
-			"",
-		),
-		agent.WithTools(
-			fetchMyAudienceData(nil, startDate, endDate),
-			fetchMyCreativeData(nil, startDate, endDate),
-			fetchMyRegionData(nil, startDate, endDate),
-			fetchMyPlacementData(nil, startDate, endDate),
-
-			fetchPeerAudienceData(nil, startDate, endDate),
-			fetchPeerTopCreativeData(nil, startDate, endDate),
-			fetchPeerRegionData(nil, startDate, endDate),
-			fetchPeerPlacementData(nil, startDate, endDate),
-		),
-	)
 
 	webSearcher := agent.NewAgent(
 		"WebSearcher",
@@ -63,6 +40,7 @@ func planAndGenerateReport() {
 			`,
 			// "如果需要数据支持, 请向数据分析师和网络搜索专家获取。",
 			"如果需要数据支持, 请使用工具获取。",
+			"使用中文进行回答。",
 		),
 		agent.WithTools(
 			fetchMyAudienceData(nil, startDate, endDate),
@@ -86,6 +64,7 @@ func planAndGenerateReport() {
 			"1. 根据用户输入深入分析其意图, 充分从各个渠道获取信息, 汇总并完善。",
 			"2. 尊重数据撰写全面、客观、专业的营销方案。",
 			"3. 如果需要数据支持, 可以直接使用工具获取。",
+			"4. 使用中文进行回答。",
 		),
 
 		agent.WithTools(
@@ -101,9 +80,9 @@ func planAndGenerateReport() {
 		),
 	)
 
-	result, err := reportWriter.Run(context.Background(), "账户优化空间")
-	if err != nil {
-		log.Fatal(err)
+	response := reportWriter.Invoke(context.Background(), "账户优化空间")
+	if response.Error != nil {
+		log.Fatal(response.Error)
 	}
-	fmt.Println(result)
+	fmt.Println(response.Answer)
 }

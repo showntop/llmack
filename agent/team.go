@@ -30,7 +30,7 @@ type Team struct {
 func NewTeam(mode TeamMode, opts ...Option) *Team {
 	team := &Team{
 		mode:     mode,
-		response: &TeamRunResponse{},
+		response: &TeamRunResponse{Stream: make(chan *llm.Chunk)},
 	}
 	for _, opt := range opts {
 		opt(team)
@@ -41,8 +41,15 @@ func NewTeam(mode TeamMode, opts ...Option) *Team {
 	return team
 }
 
-func (t *Team) Run(ctx context.Context, query string) (string, error) {
-	prog := program.FunCall(program.WithLLMInstance(t.llm))
+func (t *Team) Invoke(ctx context.Context, query string, optfuncs ...InvokeOption) *TeamRunResponse {
+	options := &InvokeOptions{
+		Retries: 1,
+	}
+	for _, opt := range optfuncs {
+		opt(options)
+	}
+
+	prog := program.FunCall(program.WithLLMInstance(t.llm)).WithStream(options.Stream)
 	if t.mode == TeamModeRoute {
 		prog.WithInstruction(routePrompt).WithTools(t.distributeTask())
 	} else if t.mode == TeamModeCoordinate {
@@ -58,22 +65,24 @@ func (t *Team) Run(ctx context.Context, query string) (string, error) {
 		"agents":       t.renderAgents(t.members),
 	}).InvokeQuery(ctx, query)
 	if predictor.Error() != nil {
-		return "", predictor.Error()
+		t.response.Error = predictor.Error()
+		return t.response
 	}
-	// log result
-	// for _, toolCall := range result.ToolCalls() {
-	// 	log.InfoContextf(ctx, "team result tool call:\n - id: %s\n - name: %s\n - args: %s", toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments)
-	// }
+	if options.Stream {
+		go func() {
+			for chunk := range predictor.Stream() {
+				t.response.Stream <- chunk
+			}
+		}()
+	}
 
-	// toolCalls := result.ToolCalls()
-	// if len(toolCalls) > 0 {
-	// 	results, err := t.invokeTools(ctx, toolCalls)
-	// 	if err != nil {
-	// 		return "", err
-	// 	}
-	// 	return results[toolCalls[0].Function.Name], nil
-	// }
-	return predictor.Completion(), nil
+	t.response.Answer = predictor.Completion()
+
+	return t.response
+}
+
+func (t *Team) DebugAssignTask() string {
+	return t.assignTask()
 }
 
 func (t *Team) assignTask() string {
@@ -93,6 +102,8 @@ func (t *Team) assignTask() string {
 		if agent == nil {
 			return "", fmt.Errorf("agent not found")
 		}
+		// deep copy a agent
+		agent = agent.Copy()
 
 		taskInstruction := "You are a member of a team of agents. Your goal is to complete the following task:"
 		taskInstruction += "\n\n<task>\n" + task + "\n</task>"
@@ -100,13 +111,23 @@ func (t *Team) assignTask() string {
 			taskInstruction += "\n\n<expected_output>\n" + expectedOutput + "\n</expected_output>"
 		}
 		// run the agent
-		response := agent.Invoke(ctx, taskInstruction)
-		if response.Error != nil {
-			return "", response.Error
+		agentResponse := agent.Invoke(ctx, taskInstruction, WithStream(true)) // stream false for blocking util agent completion was built
+		if agentResponse.Error != nil {
+			return "", agentResponse.Error
 		}
-		t.response.AddMemberResponse(response)
+		t.response.AddMemberResponse(agentResponse)
 
-		return response.Completion(), nil
+		for chunk := range agentResponse.Stream { // block until agent completion
+			if agent.stream { // and show member response
+				t.response.Stream <- chunk // 防止 t.response.Stream 容量太小，产生 block
+			}
+		}
+		// recheck error because agent may not have completed
+		if agentResponse.Error != nil {
+			return "", agentResponse.Error
+		}
+		// log.InfoContextf(ctx, "agent %s completed with response: %s", agent.Name, agentResponse.Answer)
+		return agentResponse.Completion(), nil
 	}
 	tl := &tool.Tool{}
 	tl.Name = "assign_task_to_member"
@@ -189,7 +210,7 @@ func (t *Team) renderAgents(members []*Agent) string {
 	builder := strings.Builder{}
 	builder.WriteString("<team_members>\n")
 	for idx, member := range members {
-		builder.WriteString(fmt.Sprintf("- Agent %d:\n", idx))
+		builder.WriteString(fmt.Sprintf("- Agent %d:\n", idx+1))
 		builder.WriteString(fmt.Sprintf("\t- Name: %s\n", member.Name))
 		builder.WriteString(fmt.Sprintf("\t- Description: %s\n", member.Description))
 		builder.WriteString("\t- Available Tools: \n")
@@ -216,8 +237,8 @@ Here are the agents in your team:
   - task (str): A clear description of the task.
   - expected_output (str): The expected output.
 - You can pass tasks to multiple members at once.
-- You must always validate the output of the other Agents before responding to the user.
-- Evaluate the response from other agents. If you feel the task has been completed, you can stop and respond to the user.
+- You must always analyzing the output of the other Agents before responding to the user.
+- After analyzing the response from the member agent, If you feel the task has been completed, you can stop and respond to the user.
 - You can re-assign the task if you are not satisfied with the result.
 </how_to_respond>
 

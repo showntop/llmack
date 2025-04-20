@@ -56,7 +56,7 @@ func main() {
 	team := agent.NewTeam(
 		agent.TeamModeRoute,
 		agent.WithLLM(model),
-		agent.WithMembers([]*agent.Agent{agent1, agent2, agent3}),
+		agent.WithMembers(agent1, agent2, agent3),
 		agent.WithName("Multi Language Translator Team"),
 		agent.WithDescription("You are a language router that directs questions to the appropriate language agent."),
 		agent.WithInstructions(
@@ -69,10 +69,10 @@ func main() {
 		),
 	)
 
-	result, err := team.Run(context.Background(), "How are you?")
-	if err != nil {
-		panic(err)
+	response := team.Invoke(context.Background(), "How are you?")
+	if response.Error != nil {
+		panic(response.Error)
 		// log.ErrorContext(context.Background(), err)
 	}
-	fmt.Println(result)
+	fmt.Println(response)
 }

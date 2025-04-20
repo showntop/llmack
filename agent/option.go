@@ -99,3 +99,13 @@ func WithMembers(members ...*Agent) Option {
 		}
 	}
 }
+
+// func WithStream(stream bool) Option {
+// 	return func(a any) {
+// 		if aa, ok := a.(*Agent); ok {
+// 			aa.stream = stream
+// 		} else if at, ok := a.(*Team); ok {
+// 			at.stream = stream
+// 		}
+// 	}
+// }

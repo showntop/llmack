@@ -12,6 +12,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var MaxIterationNum = 20
+
 // FunCall ...
 func FunCall(opts ...option) *predictor {
 	p := NewPredictor(opts...)
@@ -29,9 +31,8 @@ func (rp *funcall) Invokex(ctx context.Context, query string) *predictor {
 	defer close(rp.reponse.stream)
 
 	// 迭代次数
-	maxIterationNum := 2
-	for i := range maxIterationNum {
-		if i == maxIterationNum-1 { // remove tool
+	for i := range MaxIterationNum {
+		if i == MaxIterationNum-1 { // remove tool
 			rp.tools = []any{}
 		}
 		p, finish := rp.invoke(ctx, query)
@@ -73,8 +74,7 @@ func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) 
 		return t
 	}
 	for chunk := range stream.Next() {
-		rp.reponse.stream <- chunk
-		deltaMessage := chunk.Choices[0].Message
+		deltaMessage := chunk.Choices[0].Delta
 		if len(deltaMessage.ToolCalls) > 0 { // tool call
 			for i := range deltaMessage.ToolCalls {
 				t := findToolCall(deltaMessage.ToolCalls[i].ID)
@@ -83,14 +83,15 @@ func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) 
 				t.Function.Name += deltaMessage.ToolCalls[i].Function.Name
 				t.Function.Arguments += deltaMessage.ToolCalls[i].Function.Arguments
 			}
-			answer += deltaMessage.Content()
-			continue
 		}
 		answer += deltaMessage.Content()
+		if rp.stream {
+			rp.reponse.stream <- chunk
+		}
 	}
 	rp.reponse.message = llm.NewAssistantMessage(answer)
 	if len(toolCalls) > 0 {
-		log.InfoContextf(ctx, "program funcall invoke tools toolCalls: %v", toolCalls)
+		log.InfoContextf(ctx, "program funcall invoke tools toolcalls: %v", toolCalls)
 		rp.observers = append(rp.observers, llm.NewAssistantMessage(answer).WithToolCalls(toolCalls))
 		toolResults, err := rp.invokeTools(ctx, toolCalls)
 		if err != nil { // 调用工具出错
@@ -236,7 +237,7 @@ func (rp *funcall) invokeTools(ctx context.Context, toolCalls []*llm.ToolCall) (
 				ch <- [2]string{toolCall.ID, "error with " + err.Error()}
 				return err
 			}
-			log.InfoContextf(ctx, "program funcall invoke tool: %s, %s response: %s error: %v \n", toolCall.ID, toolCall.Function.Arguments, toolResult, err)
+			// log.InfoContextf(ctx, "program funcall invoke tool: %s, %s response: %s error: %v \n", toolCall.ID, toolCall.Function.Arguments, toolResult, err)
 			ch <- [2]string{toolCall.ID, toolResult}
 			return nil
 		})
@@ -245,7 +246,6 @@ func (rp *funcall) invokeTools(ctx context.Context, toolCalls []*llm.ToolCall) (
 	var err error
 	go func() {
 		err = wg.Wait()
-
 		close(ch)
 	}()
 

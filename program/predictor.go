@@ -153,7 +153,7 @@ func (p *predictor) Invokex(ctx context.Context, query string) *predictor {
 	answerContent := ""
 	for chunk := range stream.Next() {
 		p.reponse.stream <- chunk
-		answerContent += chunk.Choices[0].Message.Content()
+		answerContent += chunk.Choices[0].Delta.Content()
 	}
 
 	p.reponse.message = llm.NewAssistantMessage(answerContent)

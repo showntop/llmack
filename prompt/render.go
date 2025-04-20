@@ -161,7 +161,6 @@ func toString(val any) string {
 	if val == nil {
 		return "nil" // f'None' -> "None"
 	}
-	fmt.Println(val)
 	switch val := val.(type) {
 	case string:
 		return val

@@ -152,7 +152,7 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Response {
 	var answer string
 	for chunk := stream.Take(); chunk != nil; chunk = stream.Take() {
 		value.stream <- chunk
-		answer += chunk.Choices[0].Message.Content()
+		answer += chunk.Choices[0].Delta.Content()
 	}
 	value.completion = answer
 	close(value.stream)

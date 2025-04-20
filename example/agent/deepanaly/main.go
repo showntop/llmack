@@ -18,6 +18,12 @@ import (
 )
 
 var (
+	// 将日期按 6 天一个周期进行划分
+	startDate, _ = time.Parse("2006-01-02", "2025-03-25")
+	endDate, _   = time.Parse("2006-01-02", "2025-04-01")
+)
+
+var (
 	MODEL_NAME_R1 = "ep-20250227113433-vv7hr"
 	MODEL_NAME_V3 = "ep-20250227112432-tlpgl"
 )
@@ -42,6 +48,7 @@ func init() {
 }
 
 func main() {
+	// InvokeDataAnalyst(context.Background())
 	planAndGenerateReport()
 }
 

@@ -55,7 +55,7 @@ func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest
 	}
 	payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
 	payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
-	payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
+	// payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
 
 	log.InfoContextf(ctx, "OAILLM ChatCompletions request payload %s", string(payload)) // for debug
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", o.baseURL, bytes.NewReader(payload))
@@ -95,7 +95,7 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 	if len(options.Tools) <= 0 {
 		return request
 	}
-	request.ToolChoice = "required"
+	request.ToolChoice = "auto"
 	request.Tools = options.Tools
 	return request
 }

@@ -115,7 +115,6 @@ type MarkableOutputAdapter struct {
 
 // Parse ...
 func (ada *MarkableOutputAdapter) Parse(completion string, object any) error {
-	fmt.Println(completion)
 	fieldHeaderPattern := regexp.MustCompile(`\[\[ ## (\w+) ## \]\]`) // Replace with the actual regex pattern
 
 	sections := make([][2]string, 1)
@@ -131,7 +130,6 @@ func (ada *MarkableOutputAdapter) Parse(completion string, object any) error {
 	objectValue := reflect.ValueOf(object).Elem()
 	for i := range sections {
 		fieldType := objectValue.FieldByName(sections[i][0])
-		fmt.Println(sections[i][0], fieldType.Kind())
 		if fieldType.Kind() == reflect.String {
 			fieldType.SetString(sections[i][1])
 		} else if fieldType.Kind() == reflect.Slice {
@@ -329,11 +327,9 @@ func (ada *RawInputAdapter) Format(p *predictor, inputs map[string]any, _ any) (
 	if err != nil {
 		return nil, err
 	}
-
 	userPromptBuilder := strings.Builder{}
 	userPromptBuilder.WriteString(p.Instruction)
 	userPromptBuilder.WriteByte('\n')
-	fmt.Println(userPromptBuilder.String())
 	messages := []llm.Message{
 		llm.NewSystemMessage(userPromptBuilder.String()),
 	}

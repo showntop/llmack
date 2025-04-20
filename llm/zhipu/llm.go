@@ -2,7 +2,6 @@ package zhipu
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/openai/openai-go"
@@ -63,8 +62,6 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.Invo
 			})
 		}
 	}
-	raw, _ := json.Marshal(internalMessages)
-	fmt.Println(string(raw))
 	var internalTools []zhipu.ChatCompletionTool
 	for _, t := range opts.Tools {
 		internalTools = append(internalTools, zhipu.ChatCompletionToolFunction{
