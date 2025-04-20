@@ -29,7 +29,8 @@ func init() {
 }
 
 func main() {
-	funcallStream()
+	funcall()
+	// funcallStream()
 }
 
 func funcall() {
