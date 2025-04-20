@@ -27,22 +27,18 @@ type LLM struct {
 }
 
 // Invoke TODO
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options *llm.InvokeOptions) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
-	}
-	var opts llm.InvokeOptions
-	for _, o := range options {
-		o(&opts)
 	}
 
 	var messagesOpenAI []openai.ChatCompletionMessageParamUnion
 	for _, m := range messages {
-		if m.Role() == llm.PromptMessageRoleSystem {
+		if m.Role() == llm.MessageRoleSystem {
 			messagesOpenAI = append(messagesOpenAI, openai.SystemMessage(m.Content()))
-		} else if m.Role() == llm.PromptMessageRoleAssistant {
+		} else if m.Role() == llm.MessageRoleAssistant {
 			messagesOpenAI = append(messagesOpenAI, openai.AssistantMessage(m.Content()))
-		} else if m.Role() == llm.PromptMessageRoleUser {
+		} else if m.Role() == llm.MessageRoleUser {
 			if m.Content() != "" {
 				messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content()))
 			}
@@ -60,7 +56,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 				}
 				messagesOpenAI = append(messagesOpenAI, openai.UserMessageParts(partsOpenAI...))
 			}
-		} else if m.Role() == llm.PromptMessageRoleTool {
+		} else if m.Role() == llm.MessageRoleTool {
 			messagesOpenAI = append(messagesOpenAI, openai.ToolMessage(m.Content(), m.ToolID()))
 		} else {
 			continue
@@ -68,7 +64,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 	}
 
 	var toolsOpenAI []openai.ChatCompletionToolParam
-	for _, t := range opts.Tools {
+	for _, t := range options.Tools {
 		toolsOpenAI = append(toolsOpenAI, openai.ChatCompletionToolParam{
 			Type: openai.F(openai.ChatCompletionToolTypeFunction),
 			Function: openai.F(openai.FunctionDefinitionParam{
@@ -82,7 +78,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 	params := openai.ChatCompletionNewParams{
 		Messages: openai.F(messagesOpenAI),
 		Tools:    openai.F(toolsOpenAI),
-		Model:    openai.F(opts.Model),
+		Model:    openai.F(options.Model),
 	}
 	rawx, _ := json.Marshal(params)
 	log.InfoContextf(ctx, "Openai-c chat request payload %s", string(rawx))
@@ -104,7 +100,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 				continue
 			}
 
-			mmm := llm.AssistantPromptMessage(chunk.Choices[0].Delta.Content)
+			mmm := llm.NewAssistantMessage(chunk.Choices[0].Delta.Content)
 
 			if tool, ok := acc.JustFinishedToolCall(); ok {
 				call := acc.Choices[0].Message.ToolCalls[tool.Index]

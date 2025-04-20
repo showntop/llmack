@@ -100,8 +100,8 @@ func (rp *react) WithInstruction(i string) *react {
 }
 
 // Invoke invoke forward for predicte
-func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
-	var value Result = Result{p: rp.predictor, stream: make(chan any, 10000)}
+func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Response {
+	var value Response = Response{p: rp.predictor, stream: make(chan *llm.Chunk, 10000)}
 	value.p = rp.predictor
 
 	thoughts := []map[string]any{}
@@ -110,7 +110,7 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 		if err != nil {
 			continue
 		}
-		value.stream <- result.Thoughts.Speak
+		value.stream <- llm.NewChunk(0, llm.NewAssistantMessage(result.Thoughts.Speak), nil)
 		if result.Tool != nil {
 			if result.Tool.Name == "finish" {
 				thoughts = append(thoughts, map[string]any{
@@ -139,9 +139,9 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 
 	messages := []llm.Message{}
 	iii, _ := prompt.Render(rp.userInstruction, inputs)
-	messages = append(messages, llm.UserTextPromptMessage(iii))
-	messages = append(messages, llm.AssistantPromptMessage(rp.renderThoughts(thoughts)))
-	messages = append(messages, llm.UserTextPromptMessage("continue"))
+	messages = append(messages, llm.NewUserTextMessage(iii))
+	messages = append(messages, llm.NewAssistantMessage(rp.renderThoughts(thoughts)))
+	messages = append(messages, llm.NewUserTextMessage("continue"))
 	response, err := rp.model.Invoke(ctx, messages,
 		llm.WithStream(true),
 	)
@@ -150,9 +150,9 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Result {
 	}
 	stream := response.Stream()
 	var answer string
-	for chunk := stream.Next(); chunk != nil; chunk = stream.Next() {
+	for chunk := stream.Take(); chunk != nil; chunk = stream.Take() {
 		value.stream <- chunk
-		answer += chunk.Delta.Message.Content()
+		answer += chunk.Choices[0].Message.Content()
 	}
 	value.completion = answer
 	close(value.stream)
@@ -166,8 +166,8 @@ func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []m
 		return nil, err
 	}
 	if len(thoughts) > 0 {
-		messages = append(messages, llm.AssistantPromptMessage(rp.renderThoughts(thoughts)))
-		messages = append(messages, llm.UserTextPromptMessage("Determine next step to do(tool use or output), and respond using the format specified in above."))
+		messages = append(messages, llm.NewAssistantMessage(rp.renderThoughts(thoughts)))
+		messages = append(messages, llm.NewUserTextMessage("Determine next step to do(tool use or output), and respond using the format specified in above."))
 	}
 	response, err := rp.model.Invoke(ctx, messages,
 		llm.WithStream(true),

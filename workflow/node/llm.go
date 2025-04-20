@@ -45,13 +45,13 @@ func (n *llmNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, er
 		if err != nil {
 			return nil, err
 		}
-		messages = append(messages, llm.SystemPromptMessage(newSystemPrompt))
+		messages = append(messages, llm.NewSystemMessage(newSystemPrompt))
 	}
 	newUserPrompt, err := prompt.Render(userPrompt, r.Inputs)
 	if err != nil {
 		return nil, err
 	}
-	messages = append(messages, llm.UserTextPromptMessage(newUserPrompt))
+	messages = append(messages, llm.NewUserTextMessage(newUserPrompt))
 	response, err := model.Invoke(ctx, messages, llm.WithStream(true))
 	if err != nil {
 		return nil, err

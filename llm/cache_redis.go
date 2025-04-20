@@ -76,8 +76,8 @@ func (m *RedisCache) Fetch(ctx context.Context, messages []Message) (*CachedDocu
 // Store ...
 func (m *RedisCache) Store(ctx context.Context, document *CachedDocument, value string) error {
 	document.ID = uuid.NewString()
-	if err := m.VectorStore.Store(ctx, document.ID, document.Vector); err != nil {
-		return err
-	}
+	// if err := m.VectorStore.Store(ctx, document.ID, document.Vector); err != nil {
+	// 	return err
+	// }
 	return nil
 }

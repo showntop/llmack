@@ -114,7 +114,6 @@ func (mi *Instance) Invoke(ctx context.Context,
 			i--
 		}
 	}
-
 	response, err := mi.invoke(ctx, messages, options...)
 
 	if mi.opts != nil && mi.opts.hooks != nil {
@@ -202,18 +201,22 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 		result := ""
 		firstChunk := true
 
-		for chunk := response.stream.Next(); chunk != nil; chunk = response.stream.Next() {
+		for chunk := response.stream.Take(); chunk != nil; chunk = response.stream.Take() {
 			if firstChunk {
 				for _, hook := range mi.opts.hooks {
 					ctx = hook.OnFirstChunk(ctx, nil)
 				}
 			}
+			if len(chunk.Choices) <= 0 {
+				mi.opts.logger.WarnContextf(ctx, "llm stream response chunk choices is empty")
+				continue
+			}
 			firstChunk = false
 			newResp.stream.Push(chunk)
-			if chunk.Delta.Message.ReasoningContent != "" {
-				result += chunk.Delta.Message.ReasoningContent
+			if chunk.Choices[0].Message.ReasoningContent != "" {
+				result += chunk.Choices[0].Message.ReasoningContent
 			}
-			result += chunk.Delta.Message.content
+			result += chunk.Choices[0].Message.content
 		}
 		if updateCache != nil {
 			updateCache(ctx, result)
@@ -232,7 +235,7 @@ func (mi *Instance) handleStreamCache(ctx context.Context, answer string) (*Resp
 		mi.opts.logger.InfoContextf(ctx, "llm cache stream cache value %s", answer)
 		respone.stream.Push(NewChunk(
 			0,
-			AssistantPromptMessage(answer),
+			NewAssistantMessage(answer),
 			nil,
 		))
 	}()

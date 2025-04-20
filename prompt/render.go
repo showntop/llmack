@@ -12,6 +12,7 @@ import (
 
 // Render ...
 func Render(template string, values map[string]any) (string, error) {
+	template = "{% autoescape off %}" + template + "{% endautoescape %}"
 	tmpl, err := pongo2.FromString(template)
 	if err != nil {
 		return "", err

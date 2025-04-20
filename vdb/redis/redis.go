@@ -5,9 +5,17 @@ import (
 	"fmt"
 	"strconv"
 
+	"slices"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/showntop/llmack/vdb"
 )
+
+var Name = "redis"
+
+func init() {
+	vdb.Register(Name, New)
+}
 
 type VDB struct {
 	client    *redis.Client
@@ -16,40 +24,50 @@ type VDB struct {
 }
 
 type Config struct {
-	Address   string
-	Password  string
-	DB        int
-	Index     string
-	Dimension int
+	redis.Options
+	redis.FTCreateOptions
+	Index       string
+	KeyPrefix   string
+	FieldSchema []*redis.FieldSchema
 }
 
-func New(cfg Config) (*VDB, error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.Address,
-		Password: cfg.Password,
-		DB:       cfg.DB,
-	})
+func New(config any) (vdb.VDB, error) {
+	ctx := context.Background()
+
+	cfg, ok := config.(*Config)
+	if !ok {
+		return nil, fmt.Errorf("invalid config must be *redis.Config, got: %T", config)
+	}
+	client := redis.NewClient(&cfg.Options)
 
 	// 测试连接
-	if err := client.Ping(context.Background()).Err(); err != nil {
+	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("connect redis: %w", err)
 	}
 
 	db := &VDB{
-		client:    client,
-		index:     cfg.Index,
-		dimension: cfg.Dimension,
+		client: client,
+		index:  cfg.Index,
+		// dimension: cfg.FTCreateOptions.,
 	}
 
 	// 确保索引存在
-	if err := db.ensureIndex(); err != nil {
+	if err := db.ensureIndex(ctx); err != nil {
 		return nil, err
 	}
 
 	return db, nil
 }
 
+func (r *VDB) Store(ctx context.Context, docs []*vdb.Document) error {
+	for _, doc := range docs {
+		return r.client.Do(ctx, "HSET", r.index, doc.ID, doc.Metadata).Err()
+	}
+	return nil
+}
+
 func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOption) ([]vdb.Document, error) {
+
 	// 应用搜索选项
 	options := &vdb.SearchOptions{
 		Topk:      10,
@@ -88,11 +106,9 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 		if score > options.Threshold {
 			id, _ := strconv.ParseInt(fields[1].(string), 10, 64)
 			docs = append(docs, vdb.Document{
-				ID:     strconv.FormatInt(id, 10),
-				Query:  fields[3].(string),
-				Answer: fields[5].(string),
-				Score:  []float64{score},
-				Vector: vector,
+				ID:       strconv.FormatInt(id, 10),
+				Title:    fields[3].(string),
+				Metadata: fields[5].(map[string]any),
 			})
 		}
 	}
@@ -123,46 +139,64 @@ func (r *VDB) Close() error {
 
 // 私有辅助方法
 
-func (r *VDB) ensureIndex() error {
-	ctx := context.Background()
-
+func (r *VDB) ensureIndex(ctx context.Context) error {
 	// 检查索引是否存在
-	res := r.client.Do(ctx, "FT._LIST")
+	res := r.client.FT_List(ctx)
 	if res.Err() != nil {
 		return fmt.Errorf("check index: %w", res.Err())
 	}
 
-	indices, err := res.Slice()
+	indices, err := res.Result()
 	if err != nil {
 		return fmt.Errorf("parse indices: %w", err)
 	}
 
 	// 如果索引不存在，创建索引
-	indexExists := false
-	for _, idx := range indices {
-		if idx.(string) == r.index {
-			indexExists = true
-			break
-		}
+	indexExists := slices.Contains(indices, r.index)
+	if indexExists {
+		return nil
 	}
 
-	if !indexExists {
-		// 创建索引
-		err := r.client.Do(ctx, "FT.CREATE", r.index,
-			"ON", "HASH",
-			"PREFIX", "1", "doc:",
-			"SCHEMA",
-			"id", "NUMERIC", "SORTABLE",
-			"query", "TEXT",
-			"answer", "TEXT",
-			"vector", "VECTOR", "FLOAT32",
-			fmt.Sprintf("DIM %d", r.dimension),
-			"DISTANCE_METRIC", "L2",
-		).Err()
+	// schemas should match DocumentToHashes configured in IndexerConfig.
+	schemas := []*redis.FieldSchema{
+		{
+			FieldName: "content",
+			FieldType: redis.SearchFieldTypeText,
+			Weight:    1,
+		},
+		{
+			FieldName: "vector_content",
+			FieldType: redis.SearchFieldTypeVector,
+			VectorArgs: &redis.FTVectorArgs{
+				// FLAT index: https://redis.io/docs/latest/develop/interact/search-and-query/advanced-concepts/vectors/#flat-index
+				// Choose the FLAT index when you have small datasets (< 1M vectors) or when perfect search accuracy is more important than search latency.
+				FlatOptions: &redis.FTFlatOptions{
+					Type:           "FLOAT32", // BFLOAT16 / FLOAT16 / FLOAT32 / FLOAT64. BFLOAT16 and FLOAT16 require v2.10 or later.
+					Dim:            1024,      // keeps same with dimensions of Embedding
+					DistanceMetric: "COSINE",  // L2 / IP / COSINE
+				},
+				// HNSW index: https://redis.io/docs/latest/develop/interact/search-and-query/advanced-concepts/vectors/#hnsw-index
+				// HNSW, or hierarchical navigable small world, is an approximate nearest neighbors algorithm that uses a multi-layered graph to make vector search more scalable.
+				HNSWOptions: nil,
+			},
+		},
+		{
+			FieldName: "extra_field_number",
+			FieldType: redis.SearchFieldTypeNumeric,
+		},
+	}
 
-		if err != nil {
-			return fmt.Errorf("create index: %w", err)
-		}
+	// 创建索引
+	createIndex := r.client.FTCreate(ctx, r.index,
+		&redis.FTCreateOptions{
+			OnHash: true,
+			Prefix: []any{},
+		},
+		schemas...,
+	)
+
+	if createIndex.Err() != nil {
+		return fmt.Errorf("create index: %w", createIndex.Err())
 	}
 
 	return nil

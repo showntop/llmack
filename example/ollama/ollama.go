@@ -22,7 +22,7 @@ func main() {
 	})
 
 	resp, err := llm.NewInstance("ollama").Invoke(ctx, []llm.Message{
-		llm.UserTextPromptMessage("你好"),
+		llm.NewUserTextMessage("你好"),
 	}, llm.WithModel("llama3.1"), llm.WithStream(true))
 	if err != nil {
 		panic(err)

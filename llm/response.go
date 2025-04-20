@@ -42,13 +42,28 @@ func (resp *Response) Result() *Result {
 	resp.result = &Result{}
 	// 合并 message
 	text := ""
-	text2 := ""
-	for it := resp.stream.Next(); it != nil; it = resp.stream.Next() {
-		text += it.Delta.Message.content
-		text2 += it.Delta.Message.ReasoningContent
+	reasoning := ""
+	toolcalls := []*ToolCall{}
+	currentTool := &ToolCall{Index: -1}
+	for it := resp.stream.Take(); it != nil; it = resp.stream.Take() {
+		deltaMessage := it.Choices[0].Message
+		text += deltaMessage.content
+		reasoning += deltaMessage.ReasoningContent
+		for _, toolcall := range deltaMessage.ToolCalls {
+			if currentTool.Index != toolcall.Index {
+				currentTool = toolcall
+				toolcalls = append(toolcalls, currentTool)
+			} else {
+				currentTool.ID += toolcall.ID
+				currentTool.Type += toolcall.Type
+				currentTool.Function.Name += toolcall.Function.Name
+				currentTool.Function.Arguments += toolcall.Function.Arguments
+			}
+		}
 	}
-	message := AssistantPromptMessage(text)
-	message.ReasoningContent = text2
+	message := NewAssistantMessage(text)
+	message.ReasoningContent = reasoning
+	message.ToolCalls = toolcalls
 	resp.result.Message = message
 	return resp.result
 }
@@ -57,9 +72,9 @@ func (resp *Response) Result() *Result {
 type Result struct {
 	Model string `json:"model"`
 	// Messages          []*PromptMessage
-	Message           *assistantPromptMessage `json:"message"`
-	Usage             *Usage                  `json:"usage"`
-	SystemFingerprint string                  `json:"system_fingerprint"`
+	Message           *AssistantMessage `json:"message"`
+	Usage             *Usage            `json:"usage"`
+	SystemFingerprint string            `json:"system_fingerprint"`
 }
 
 // String ...
@@ -68,11 +83,14 @@ func (r *Result) String() string {
 }
 
 // NewChunk ...
-func NewChunk(i int, msg *assistantPromptMessage, useage *Usage) *Chunk {
+func NewChunk(i int, msg *AssistantMessage, useage *Usage) *Chunk {
 	return &Chunk{
-		Delta: &ChunkDelta{
-			Message:      msg,
-			FinishReason: "",
+		Choices: []*ChunkChoice{
+			{
+				Index:        i,
+				Message:      msg,
+				FinishReason: "",
+			},
 		},
 	}
 }
@@ -109,24 +127,25 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 	chunk.Model = mmm.Model
 	chunk.Object = mmm.Object
 	// chunk.SystemFingerprint = mmm.SystemFingerprint
-	chunk.Delta = &ChunkDelta{}
-	chunk.Delta.Index = 0
+	chunk.Choices = make([]*ChunkChoice, 1, 1)
+	chunk.Choices[0] = &ChunkChoice{}
+	chunk.Choices[0].Index = 0
 
 	if mmm.Choices[0].Delta.ReasoningContent != "" {
-		chunk.Delta.Message = AssistantReasoningMessage(mmm.Choices[0].Delta.ReasoningContent)
+		chunk.Choices[0].Message = NewAssistantReasoningMessage(mmm.Choices[0].Delta.ReasoningContent)
 	} else if len(mmm.Choices[0].Delta.ToolCalls) > 0 {
-		chunk.Delta.Message = AssistantPromptMessage(mmm.Choices[0].Delta.Content)
-		chunk.Delta.Message.ToolCalls = mmm.Choices[0].Delta.ToolCalls
+		chunk.Choices[0].Message = NewAssistantMessage(mmm.Choices[0].Delta.Content)
+		chunk.Choices[0].Message.ToolCalls = mmm.Choices[0].Delta.ToolCalls
 	} else {
-		chunk.Delta.Message = AssistantPromptMessage(mmm.Choices[0].Delta.Content)
+		chunk.Choices[0].Message = NewAssistantMessage(mmm.Choices[0].Delta.Content)
 	}
-	chunk.Delta.FinishReason = mmm.Choices[0].FinishReason
+	chunk.Choices[0].FinishReason = mmm.Choices[0].FinishReason
 
-	choices := []*ChunkDelta{}
+	choices := []*ChunkChoice{}
 	for i := 0; i < len(mmm.Choices); i++ {
-		choices = append(choices, &ChunkDelta{
+		choices = append(choices, &ChunkChoice{
 			Index:        i,
-			Message:      chunk.Delta.Message,
+			Message:      chunk.Choices[0].Message,
 			FinishReason: mmm.Choices[i].FinishReason,
 		})
 	}
@@ -136,22 +155,22 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 
 // Chunk ...
 type Chunk struct {
-	ID                string        `json:"id"`
-	CreatedAt         int64         `json:"created_at"`
-	Model             string        `json:"model"`
-	Object            string        `json:"object"`
-	SystemFingerprint string        `json:"system_fingerprint"`
-	Choices           []*ChunkDelta `json:"choices"`
-	Usage             *Usage        `json:"usage"`
-	Delta             *ChunkDelta   `json:"-"`
+	ID                string         `json:"id"`
+	CreatedAt         int64          `json:"created_at"`
+	Model             string         `json:"model"`
+	Object            string         `json:"object"`
+	SystemFingerprint string         `json:"system_fingerprint"`
+	Choices           []*ChunkChoice `json:"choices"`
+	Usage             *Usage         `json:"usage"`
+	// Delta             *ChunkDelta   `json:"-"`
 }
 
-// ChunkDelta ...
-type ChunkDelta struct {
-	Index        int                     `json:"index"`
-	FinishReason string                  `json:"finish_reason"`
-	Logprobs     any                     `json:"logprobs"`
-	Message      *assistantPromptMessage `json:"delta"`
+// ChunkChoice ...
+type ChunkChoice struct {
+	Index        int               `json:"index"`
+	FinishReason string            `json:"finish_reason"`
+	Logprobs     any               `json:"logprobs"`
+	Message      *AssistantMessage `json:"delta"`
 }
 
 // Usage ...
@@ -197,14 +216,19 @@ func (s *Stream) Read(body io.ReadCloser, fn func(chunk []byte) (*Chunk, bool)) 
 	}()
 }
 
-// Next ...
-func (s *Stream) Next() *Chunk {
+// Take ...
+func (s *Stream) Take() *Chunk {
 	select {
 	case it := <-s.q:
 		return it
 		// default:
 		// 	return nil
 	}
+}
+
+// Next ...
+func (s *Stream) Next() <-chan *Chunk {
+	return s.q
 }
 
 // Close ...

@@ -58,7 +58,7 @@ func (nd endNode) Execute(ctx context.Context, r *ExecRequest) (ExecResponse, er
 		if response, ok := value.(*llm.Response); ok {
 			go func() {
 				stream := response.Stream()
-				for chunk := stream.Next(); chunk != nil; chunk = stream.Next() {
+				for chunk := stream.Take(); chunk != nil; chunk = stream.Take() {
 					r.Events <- &workflow.Event{
 						Name: name,
 						Data: chunk,

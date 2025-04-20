@@ -3,99 +3,61 @@ package program
 import (
 	"context"
 	"encoding/json"
-	"strings"
+	"errors"
 
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/prompt"
 	"github.com/showntop/llmack/tool"
+	"golang.org/x/sync/errgroup"
 )
+
+// FunCall ...
+func FunCall(opts ...option) *predictor {
+	p := NewPredictor(opts...)
+	p.Mode = "funcall"
+	p.invoker = &funcall{p}
+	return p
+}
 
 type funcall struct {
 	*predictor
-	memory  Memory
-	tools   []string
-	thoughs []llm.Message
-	buffer  chan any
 }
 
-// FunCall ...
-func FunCall(opts ...option) *funcall {
-	funcall := &funcall{buffer: make(chan any, 5)}
+func (rp *funcall) Invokex(ctx context.Context, query string) *predictor {
+	// at end recycle response stream
+	defer close(rp.reponse.stream)
 
-	p := &predictor{
-		adapter: &RawAdapter{},
-		Promptx: Promptx{
-			Name:         "FunCallAgent",
-			Instruction:  FunCallPrompt,
-			Description:  "FunCall mode Agent for General tasks Solve.",
-			InputFields:  make(map[string]*Field),
-			OutputFields: make(map[string]*Field),
-		},
-	}
-	for i := 0; i < len(opts); i++ {
-		opts[i](p)
-	}
-	if p.model == nil {
-		p.model = defaultLLM
-	}
-	funcall.predictor = p
-	return funcall
-}
-
-func (rp *funcall) WithTools(tools ...string) *funcall {
-	rp.tools = tools
-	return rp
-}
-
-func (rp *funcall) WithInstruction(i string) *funcall {
-	instruction := rp.Instruction
-	instruction = strings.ReplaceAll(instruction, "{{instruction}}", i)
-	rp.predictor.Promptx.Instruction = instruction
-	return rp
-}
-
-// Invoke invoke forward for predicte
-func (rp *funcall) Invoke(ctx context.Context, inputs map[string]any) *Result {
-	var value Result = Result{p: rp.predictor, stream: rp.buffer}
-
-	go func() {
-		defer close(rp.buffer)
-		answer := ""
-		for i := 0; i < 20; i++ {
-			result, finish, err := rp.invoke(ctx, inputs)
-			if err != nil {
-				value.err = err
-				log.ErrorContextf(ctx, "agent funcall invoke error: %v", err)
-				continue
-			}
-			_ = result
-			if finish {
-				answer = result
-				break
-			}
+	// 迭代次数
+	maxIterationNum := 2
+	for i := range maxIterationNum {
+		if i == maxIterationNum-1 { // remove tool
+			rp.tools = []any{}
 		}
-		value.completion = answer
-	}()
-	return &value
+		p, finish := rp.invoke(ctx, query)
+		if p.reponse.err != nil {
+			return p
+		}
+		if finish {
+			return p
+		}
+	}
+	rp.reponse.err = errors.New("failed to invoke query until max iteration")
+	return rp.predictor
 }
 
-func (rp *funcall) invoke(ctx context.Context, inputs map[string]any) (string, bool, error) {
-	messageTools := rp.renderTools(rp.tools...)
-
-	messages, _ := rp.renderPromptMessages(ctx, rp.Instruction, inputs, "contexts")
-	response, err := rp.model.Invoke(ctx, messages,
-		llm.WithTools(messageTools...),
-		llm.WithStream(true),
-	)
+func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) {
+	llmResponse, err := rp.invokeLLM(ctx, query)
 	if err != nil {
-		return "", false, err
+		rp.reponse.err = err
+		return rp.predictor, false
 	}
-	stream := response.Stream()
-	toolCalls := []*llm.ToolCall{}
-	final := ""
+
+	stream := llmResponse.Stream()
 	finish := false
 
+	toolCalls := []*llm.ToolCall{}
+	answer := ""
 	// fill tool calls from chunk
 	findToolCall := func(id string) *llm.ToolCall {
 		if id == "" {
@@ -110,56 +72,64 @@ func (rp *funcall) invoke(ctx context.Context, inputs map[string]any) (string, b
 		toolCalls = append(toolCalls, t)
 		return t
 	}
-	for r := stream.Next(); r != nil; r = stream.Next() {
-		if len(r.Delta.Message.ToolCalls) > 0 { // tool call
-			for i := 0; i < len(r.Delta.Message.ToolCalls); i++ {
-				t := findToolCall(r.Delta.Message.ToolCalls[i].ID)
-				t.Type = r.Delta.Message.ToolCalls[i].Type
-				t.Function.Name += r.Delta.Message.ToolCalls[i].Function.Name
-				t.Function.Arguments += r.Delta.Message.ToolCalls[i].Function.Arguments
+	for chunk := range stream.Next() {
+		rp.reponse.stream <- chunk
+		deltaMessage := chunk.Choices[0].Message
+		if len(deltaMessage.ToolCalls) > 0 { // tool call
+			for i := range deltaMessage.ToolCalls {
+				t := findToolCall(deltaMessage.ToolCalls[i].ID)
+				t.Index = deltaMessage.ToolCalls[i].Index
+				t.Type = "function" //deltaMessage.ToolCalls[i].Type
+				t.Function.Name += deltaMessage.ToolCalls[i].Function.Name
+				t.Function.Arguments += deltaMessage.ToolCalls[i].Function.Arguments
 			}
-			final += r.Delta.Message.Content()
+			answer += deltaMessage.Content()
 			continue
 		}
-		rp.buffer <- r // when text only
-		final += r.Delta.Message.Content()
+		answer += deltaMessage.Content()
 	}
+	rp.reponse.message = llm.NewAssistantMessage(answer)
 	if len(toolCalls) > 0 {
-		rp.thoughs = append(rp.thoughs, llm.AssistantPromptMessage(string(final)).WithToolCalls(toolCalls))
-		for i := 0; i < len(toolCalls); i++ {
-			toolResult, err := rp.invokeTool(ctx, rp.tools, toolCalls[i])
-			if err != nil { // 调用工具出错
-				return "", false, err
-			}
-			if toolResult == "" {
-				rp.thoughs = append(rp.thoughs,
-					llm.ToolPromptMessage("no result", toolCalls[i].ID))
-				continue
-			}
-			// 记录工具调用
-			rp.thoughs = append(rp.thoughs,
-				llm.ToolPromptMessage(toolResult, toolCalls[i].ID))
+		log.InfoContextf(ctx, "program funcall invoke tools toolCalls: %v", toolCalls)
+		rp.observers = append(rp.observers, llm.NewAssistantMessage(answer).WithToolCalls(toolCalls))
+		toolResults, err := rp.invokeTools(ctx, toolCalls)
+		if err != nil { // 调用工具出错
+			rp.reponse.err = err
+			return rp.predictor, finish
+		}
+		log.InfoContextf(ctx, "program funcall invoke tools result %v", toolResults)
+		// 记录工具调用
+		for i := range toolCalls {
+			rp.observers = append(rp.observers, llm.NewToolMessage(toolResults[toolCalls[i].ID], toolCalls[i].ID))
 		}
 	} else {
-		final += "\n"
+		answer += "\n"
 		finish = true
 	}
-	return final, finish, nil
 
+	return rp.predictor, finish
 }
 
-func (rp *funcall) invokeTool(ctx context.Context, tools []string, t *llm.ToolCall) (string, error) {
-	// TODO check function name valid?
-	var args map[string]any
-	if err := json.Unmarshal([]byte(t.Function.Arguments), &args); err != nil {
-		return "", err
-	}
-	result, err := tool.Spawn(t.Function.Name).Invoke(ctx, args)
-	log.InfoContextf(ctx, "program funcall invoke tool: %s, %s response: %s error: %v \n", t.Function.Name, t.Function.Arguments, result, err)
+// invokeFuncall ...
+func (rp *funcall) invokeLLM(ctx context.Context, query string) (*llm.Response, error) {
+	messageTools := rp.buildTools(rp.tools...)
+
+	messages, err := rp.adapter.Format(rp.predictor, rp.inputs, nil) // system message
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return result, nil
+	messages = append(messages, llm.NewUserTextMessage(query))
+	// append observer message
+	messages = append(messages, rp.observers...)
+	response, err := rp.model.Invoke(ctx, messages,
+		llm.WithTools(messageTools...),
+		llm.WithStream(true),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 // renderPromptMessages ...
@@ -175,7 +145,7 @@ func (rp *funcall) renderPromptMessages(ctx context.Context, preset string,
 
 	_ = contexts
 
-	messages = append(messages, llm.UserTextPromptMessage(presetPrompt))
+	messages = append(messages, llm.NewUserTextMessage(presetPrompt))
 
 	// if memory from history
 	if rp.memory != nil {
@@ -183,7 +153,7 @@ func (rp *funcall) renderPromptMessages(ctx context.Context, preset string,
 		messages = append(messages, histories...)
 	}
 
-	messages = append(messages, rp.thoughs...)
+	messages = append(messages, rp.observers...)
 	return messages, nil
 }
 
@@ -216,11 +186,11 @@ func (rp *funcall) renderContexts(ctx context.Context, settings any, query strin
 	return contexts, nil
 }
 
-// renderTools ...
-func (rp *funcall) renderTools(tools ...string) []*llm.Tool {
+// common method
+func (rp *funcall) buildTools(tools ...any) []*llm.Tool {
 	messageTools := make([]*llm.Tool, 0)
-	for _, toolName := range tools {
-		tool := tool.Spawn(toolName)
+	for _, tl := range tools {
+		tool := tool.Spawn(tl.(string)) // 暂时只支持 string
 		messageTool := &llm.Tool{
 			Type: "function",
 			Function: &llm.FunctionDefinition{
@@ -239,7 +209,6 @@ func (rp *funcall) renderTools(tools ...string) []*llm.Tool {
 			properties[p.Name] = map[string]any{
 				"description": p.LLMDescrition,
 				"type":        p.Type,
-				"enum":        nil,
 			}
 			if p.Required {
 				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
@@ -251,16 +220,38 @@ func (rp *funcall) renderTools(tools ...string) []*llm.Tool {
 	return messageTools
 }
 
-var FunCallPrompt = `
-Use the following context as your learned knowledge, inside <context></context> XML tags.
+func (rp *funcall) invokeTools(ctx context.Context, toolCalls []*llm.ToolCall) (map[string]string, error) {
+	// 并发调用
+	ch := make(chan [2]string, len(toolCalls))
+	wg := errgroup.Group{}
+	for _, toolCall := range toolCalls {
+		wg.Go(func() error {
+			var args map[string]any
+			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+				ch <- [2]string{toolCall.ID, "error with " + err.Error()}
+				return err
+			}
+			toolResult, err := tool.Spawn(toolCall.Function.Name).Invoke(ctx, args)
+			if err != nil {
+				ch <- [2]string{toolCall.ID, "error with " + err.Error()}
+				return err
+			}
+			log.InfoContextf(ctx, "program funcall invoke tool: %s, %s response: %s error: %v \n", toolCall.ID, toolCall.Function.Arguments, toolResult, err)
+			ch <- [2]string{toolCall.ID, toolResult}
+			return nil
+		})
+	}
 
-<context>
-{{contexts}}
-</context>
+	var err error
+	go func() {
+		err = wg.Wait()
 
-When answer to user:
-- If you don't know, just say that you don't know.
-- If you don't know when you are not sure, ask for clarification.\nAvoid mentioning that you obtained the information from the context.\nAnd answer according to the language of the user's question.
+		close(ch)
+	}()
 
-{{instruction}}
-`
+	results := make(map[string]string) // 使用 chan fix 并发冲突
+	for result := range ch {
+		results[result[0]] = result[1]
+	}
+	return results, err
+}

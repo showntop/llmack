@@ -22,7 +22,7 @@ func main() {
 	})
 
 	resp, err := llm.NewInstance(moonshot.Name).Invoke(ctx, []llm.Message{
-		llm.UserTextPromptMessage("你好"),
+		llm.NewUserTextMessage("你好"),
 	}, llm.WithModel("moonshot-v1-8k"))
 	if err != nil {
 		panic(err)

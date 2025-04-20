@@ -23,7 +23,7 @@ func main() {
 	})
 
 	resp, err := llm.NewInstance(openaic.Name).Invoke(ctx, []llm.Message{
-		llm.UserMultipartPromptMessage(
+		llm.NewUserMultipartMessage(
 			llm.MultipartContentImageURL("https://img.tukuppt.com/bg_grid/05/37/54/v40ZCaqERa.jpg!/fh/350"),
 			llm.MultipartContentText("给这张图片添加一个太阳"),
 		),
@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	for it := resp.Stream().Next(); it != nil; it = resp.Stream().Next() {
+	for it := resp.Stream().Take(); it != nil; it = resp.Stream().Take() {
 		fmt.Println("final: ", it.Delta.Message)
 	}
 }

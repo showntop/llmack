@@ -7,8 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
+
+	"github.com/showntop/llmack/log"
 )
 
 // base llm by openai input and output
@@ -52,7 +53,11 @@ func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest
 	if err != nil {
 		return nil, err
 	}
-	log.Println("OAILLM ChatCompletions request payload ", string(payload)) // for debug
+	payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
+	payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
+	payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
+
+	log.InfoContextf(ctx, "OAILLM ChatCompletions request payload %s", string(payload)) // for debug
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", o.baseURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
@@ -106,6 +111,7 @@ func (o *OAILLM) handleStreamResponse(body io.ReadCloser) (*Response, error) {
 		reader := bufio.NewReader(body)
 		for {
 			line, err := readLine(reader)
+			// log.InfoContextf(context.Background(), "OAILLM handleStreamResponse line %s", string(line))
 			if err != nil {
 				if err == io.EOF {
 					break
@@ -115,8 +121,12 @@ func (o *OAILLM) handleStreamResponse(body io.ReadCloser) (*Response, error) {
 
 			chunk, err := buildChunkMessage(line) // TODO Unmarshal line
 			if err != nil {
+				log.ErrorContextf(context.Background(), "OAILLM handleStreamResponse buildChunkMessage error %s", err)
 				continue
 			}
+			// if len(chunk.Choices[0].Message.ToolCalls) > 0 {
+			// 	break
+			// }
 			response.Stream().Push(chunk)
 		}
 	}

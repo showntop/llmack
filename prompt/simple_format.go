@@ -47,7 +47,7 @@ func (p *SimplePromptFormatter) Format(preset string,
 
 	sysPrompt = strings.ReplaceAll(sysPrompt, "{{#context#}}", contexts)
 
-	sysMessage := llm.SystemPromptMessage(sysPrompt)
+	sysMessage := llm.NewSystemMessage(sysPrompt)
 
 	stops, ok := frame["stops"].(string)
 	if ok {

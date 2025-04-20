@@ -24,7 +24,7 @@ func main() {
 	resp, err := llm.NewInstance(zhipu.Name).Invoke(ctx,
 		[]llm.Message{
 			// llm.UserTextPromptMessage("你好"),
-			llm.UserMultipartPromptMessage(
+			llm.NewUserMultipartMessage(
 				llm.MultipartContentImageURL("https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg"),
 				llm.MultipartContentText("这是一张关于猫的照片吗"),
 			),

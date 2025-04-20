@@ -27,17 +27,12 @@ type LLM struct {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.InvokeOptions) (*llm.Response, error) {
 	if len(messages) == 0 {
 		return nil, errors.New("empty messages")
 	}
 	if err := m.setupClient(); err != nil {
 		return nil, err
-	}
-
-	var opts llm.InvokeOptions
-	for _, o := range options {
-		o(&opts)
 	}
 
 	var response *llm.Response = new(llm.Response)
@@ -57,7 +52,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 
 	idx := 1
 	err := m.client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		response.Stream().Push(llm.NewChunk(idx, llm.AssistantPromptMessage(resp.Message.Content), nil))
+		response.Stream().Push(llm.NewChunk(idx, llm.NewAssistantMessage(resp.Message.Content), nil))
 		if resp.Done {
 			response.Stream().Close()
 			return nil

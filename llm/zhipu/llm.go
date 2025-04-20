@@ -79,7 +79,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.Invo
 		AddTool(internalTools...).
 		SetStreamHandler(func(chunk zhipu.ChatCompletionResponse) error {
 			// println("chunk content: ", chunk.Choices[0].Delta.Content)
-			mmm := llm.AssistantPromptMessage(chunk.Choices[0].Delta.Content)
+			mmm := llm.NewAssistantMessage(chunk.Choices[0].Delta.Content)
 			response.Stream().Push(llm.NewChunk(0, mmm, nil))
 			return nil
 		})

@@ -5,13 +5,13 @@ import (
 	"fmt"
 )
 
-type PromptMessageRole string
+type MessageRole string
 
 const (
-	PromptMessageRoleSystem    PromptMessageRole = "system"
-	PromptMessageRoleUser      PromptMessageRole = "user"
-	PromptMessageRoleAssistant PromptMessageRole = "assistant"
-	PromptMessageRoleTool      PromptMessageRole = "tool"
+	MessageRoleSystem    MessageRole = "system"
+	MessageRoleUser      MessageRole = "user"
+	MessageRoleAssistant MessageRole = "assistant"
+	MessageRoleTool      MessageRole = "tool"
 )
 
 type MultipartContent struct {
@@ -35,7 +35,7 @@ func MultipartContentText(text string) *MultipartContent {
 
 // PromptMessage ...
 type PromptMessage struct {
-	role             PromptMessageRole
+	role             MessageRole
 	content          string              // string | []*PromptMessageContent
 	multiPartContent []*MultipartContent // string | []*PromptMessageContent
 	Name             string
@@ -59,17 +59,17 @@ func (m PromptMessage) GetToolCalls() []*ToolCall {
 
 // MarshalJSON 实现marshal
 func (m PromptMessage) MarshalJSON() ([]byte, error) {
-	if m.role == PromptMessageRoleAssistant {
+	if m.role == MessageRoleAssistant {
 		var xxx = map[string]any{"role": m.role, "content": m.content, "name": m.Name}
 		return json.Marshal(xxx)
-	} else if m.role == PromptMessageRoleUser {
+	} else if m.role == MessageRoleUser {
 		panic(fmt.Sprintf("user prompt message should not be marshal to json: %v", m))
 	}
 	return nil, nil
 }
 
 // Role ...
-func (m PromptMessage) Role() PromptMessageRole {
+func (m PromptMessage) Role() MessageRole {
 	return m.role
 }
 
@@ -78,60 +78,60 @@ func (m PromptMessage) ToolID() string {
 	return ""
 }
 
-// SystemPromptMessage ...
-func SystemPromptMessage(text string) PromptMessage {
+// NewSystemMessage ...
+func NewSystemMessage(text string) PromptMessage {
 	return PromptMessage{
-		role:    PromptMessageRoleSystem,
+		role:    MessageRoleSystem,
 		content: text,
 	}
 }
 
-// UserTextPromptMessage ...
-func UserTextPromptMessage(text string) PromptMessage {
+// NewUserTextMessage ...
+func NewUserTextMessage(text string) PromptMessage {
 	return PromptMessage{
-		role:    PromptMessageRoleUser,
+		role:    MessageRoleUser,
 		content: text,
 	}
 }
 
-// UserMultipartPromptMessage ...
-func UserMultipartPromptMessage(contents ...*MultipartContent) PromptMessage {
+// NewUserMultipartMessage ...
+func NewUserMultipartMessage(contents ...*MultipartContent) PromptMessage {
 	return PromptMessage{
-		role:             PromptMessageRoleUser,
+		role:             MessageRoleUser,
 		multiPartContent: contents,
 	}
 }
 
-// AssistantPromptMessage ...
-func AssistantPromptMessage(text string) *assistantPromptMessage {
-	m := &assistantPromptMessage{PromptMessage: PromptMessage{}}
+// NewAssistantMessage ...
+func NewAssistantMessage(text string) *AssistantMessage {
+	m := &AssistantMessage{PromptMessage: PromptMessage{}}
 	m.content = text
-	m.role = PromptMessageRoleAssistant
+	m.role = MessageRoleAssistant
 	return m
 }
 
-// AssistantReasoningMessage ...
-func AssistantReasoningMessage(text string) *assistantPromptMessage {
-	m := &assistantPromptMessage{ReasoningContent: text}
-	m.role = PromptMessageRoleAssistant
+// NewAssistantReasoningMessage ...
+func NewAssistantReasoningMessage(text string) *AssistantMessage {
+	m := &AssistantMessage{ReasoningContent: text}
+	m.role = MessageRoleAssistant
 	return m
 }
 
-func (m *assistantPromptMessage) WithToolCalls(toolCalls []*ToolCall) *assistantPromptMessage {
+func (m *AssistantMessage) WithToolCalls(toolCalls []*ToolCall) *AssistantMessage {
 	m.ToolCalls = toolCalls
 	return m
 }
 
-func (m *assistantPromptMessage) WithReasoningContent(content string) *assistantPromptMessage {
+func (m *AssistantMessage) WithReasoningContent(content string) *AssistantMessage {
 	m.ReasoningContent = content
 	return m
 }
 
-// ToolPromptMessage ...
-func ToolPromptMessage(text string, toolID string) *toolPromptMessage {
-	return &toolPromptMessage{
+// NewToolMessage ...
+func NewToolMessage(text string, toolID string) *ToolPromptMessage {
+	return &ToolPromptMessage{
 		PromptMessage: PromptMessage{
-			role:    PromptMessageRoleTool,
+			role:    MessageRoleTool,
 			content: text,
 			Name:    toolID,
 		},
@@ -139,18 +139,18 @@ func ToolPromptMessage(text string, toolID string) *toolPromptMessage {
 	}
 }
 
-// assistantPromptMessage ...
-type assistantPromptMessage struct {
+// AssistantMessage ...
+type AssistantMessage struct {
 	PromptMessage
 	ToolCalls        []*ToolCall `json:"tool_calls"`
 	ReasoningContent string      `json:"reasoning_content"`
 }
 
-func (m assistantPromptMessage) GetToolCalls() []*ToolCall {
+func (m AssistantMessage) GetToolCalls() []*ToolCall {
 	return m.ToolCalls
 }
 
-func (m *assistantPromptMessage) String() string {
+func (m *AssistantMessage) String() string {
 	if m.ReasoningContent != "" {
 		return fmt.Sprintf("%s: reasoning: %s", m.role, m.ReasoningContent)
 	}
@@ -158,14 +158,14 @@ func (m *assistantPromptMessage) String() string {
 	return fmt.Sprintf("%s => (content:%s tool_calls: %+v)", m.role, m.content, string(raw))
 }
 
-// toolPromptMessage ...
-type toolPromptMessage struct {
+// ToolPromptMessage ...
+type ToolPromptMessage struct {
 	PromptMessage
 	toolID string
 }
 
 // ToolID ...
-func (m toolPromptMessage) ToolID() string {
+func (m ToolPromptMessage) ToolID() string {
 	return m.toolID
 }
 
@@ -177,6 +177,10 @@ type ToolCall struct {
 	Function ToolCallFunction `json:"function"`
 }
 
+func (t *ToolCall) String() string {
+	return fmt.Sprintf("ToolCall=> id: %s type: %s index: %d function: {name: %s arguments: %s}", t.ID, t.Type, t.Index, t.Function.Name, t.Function.Arguments)
+}
+
 // ToolCallFunction ...
 type ToolCallFunction struct {
 	Name      string `json:"name"`
@@ -184,13 +188,13 @@ type ToolCallFunction struct {
 }
 
 // Messages ...
-type Messages[T PromptMessage | assistantPromptMessage] []T
+type Messages[T PromptMessage | AssistantMessage] []T
 
 // Message ...
 type Message interface {
 	Content() string
 	MultipartContent() []*MultipartContent
-	Role() PromptMessageRole
+	Role() MessageRole
 	ToolID() string
 	GetToolCalls() []*ToolCall
 	String() string

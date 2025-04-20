@@ -28,27 +28,23 @@ type LLM struct {
 }
 
 // Invoke TODO
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.InvokeOptions) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
-	}
-	var opts llm.InvokeOptions
-	for _, o := range options {
-		o(&opts)
 	}
 
 	var messagesOpenAI []azopenai.ChatRequestMessageClassification
 	for _, m := range messages {
-		if m.Role() == llm.PromptMessageRoleSystem {
+		if m.Role() == llm.MessageRoleSystem {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestSystemMessage{
 				Content: azopenai.NewChatRequestSystemMessageContent(m.Content())})
-		} else if m.Role() == llm.PromptMessageRoleAssistant {
+		} else if m.Role() == llm.MessageRoleAssistant {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestAssistantMessage{
 				Content: azopenai.NewChatRequestAssistantMessageContent(m.Content())})
-		} else if m.Role() == llm.PromptMessageRoleUser {
+		} else if m.Role() == llm.MessageRoleUser {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestUserMessage{
 				Content: azopenai.NewChatRequestUserMessageContent(m.Content())})
-		} else if m.Role() == llm.PromptMessageRoleTool {
+		} else if m.Role() == llm.MessageRoleTool {
 			messagesOpenAI = append(messagesOpenAI, &azopenai.ChatRequestToolMessage{
 				Content: azopenai.NewChatRequestToolMessageContent(m.Content())})
 		} else {
@@ -109,7 +105,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 				// if choice.Delta.Role != nil {
 				// 	role = string(*choice.Delta.Role)
 				// }
-				response.Stream().Push(llm.NewChunk(0, llm.AssistantPromptMessage(text), nil))
+				response.Stream().Push(llm.NewChunk(0, llm.NewAssistantMessage(text), nil))
 			}
 		}
 	}()

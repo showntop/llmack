@@ -24,14 +24,17 @@ func New() vdb.VDB {
 }
 
 // Store 存储向量
-func (m *VDB) Store(_ context.Context, id string, vector []float64) error {
+func (m *VDB) Store(_ context.Context, docs []*vdb.Document) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	// 创建副本以避免外部修改
-	vectorCopy := make([]float64, len(vector))
-	copy(vectorCopy, vector)
-	m.vectors[id] = vectorCopy
+	for _, doc := range docs {
+		_ = doc
+		// vectorCopy := make([]float64, len(doc.Vector))
+		// copy(vectorCopy, doc.Vector)
+		// m.vectors[doc.ID] = vectorCopy
+	}
 	return nil
 }
 
@@ -61,17 +64,18 @@ func (m *VDB) Search(_ context.Context, vector []float64, options ...vdb.SearchO
 			return nil, fmt.Errorf("vector dimension mismatch")
 		}
 
-		score := cosineSimilarity(vector, v)
+		// score := cosineSimilarity(vector, v)
 		scores = append(scores, vdb.Document{
-			ID:     id,
-			Score:  []float64{score},
-			Vector: v,
+			ID: id,
+			// Score:  []float64{score},
+			// Vector: v,
 		})
 	}
 
 	// 按相似度排序
 	sort.Slice(scores, func(i, j int) bool {
-		return scores[i].Score[0] > scores[j].Score[0]
+		// return scores[i].Score[0] > scores[j].Score[0]
+		return true
 	})
 
 	k := searchOptions.Topk

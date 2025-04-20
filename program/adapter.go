@@ -104,8 +104,8 @@ func (ada *MarkableInputAdapter) Format(p *predictor, inputs map[string]any, _ a
 	userPromptBuilder.WriteString(", and then ending with the marker for `[[ ## completed ## ]]`.")
 
 	messages := []llm.Message{
-		llm.SystemPromptMessage(sysPromptBuilder.String()),
-		llm.UserTextPromptMessage(userPromptBuilder.String()),
+		llm.NewSystemMessage(sysPromptBuilder.String()),
+		llm.NewUserTextMessage(userPromptBuilder.String()),
 	}
 	return messages, nil
 }
@@ -296,8 +296,8 @@ func (ada *JSONAdapter) Format(p *predictor, inputs map[string]any, target any) 
 	}
 
 	messages := []llm.Message{
-		llm.SystemPromptMessage(sysPromptBuilder.String()),
-		llm.UserTextPromptMessage(userPromptBuilder.String()),
+		llm.NewSystemMessage(sysPromptBuilder.String()),
+		llm.NewUserTextMessage(userPromptBuilder.String()),
 	}
 	return messages, nil
 }
@@ -329,13 +329,13 @@ func (ada *RawInputAdapter) Format(p *predictor, inputs map[string]any, _ any) (
 	if err != nil {
 		return nil, err
 	}
-	// @TODO handle error
+
 	userPromptBuilder := strings.Builder{}
 	userPromptBuilder.WriteString(p.Instruction)
 	userPromptBuilder.WriteByte('\n')
-
+	fmt.Println(userPromptBuilder.String())
 	messages := []llm.Message{
-		llm.UserTextPromptMessage(userPromptBuilder.String()),
+		llm.NewSystemMessage(userPromptBuilder.String()),
 	}
 	return messages, nil
 }

@@ -25,13 +25,9 @@ type LLM struct {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.InvokeOptions) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
-	}
-	var opts llm.InvokeOptions
-	for _, o := range options {
-		o(&opts)
 	}
 
 	// 实例化一个请求对象,每个接口都会对应一个request对象
@@ -86,7 +82,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 			if len(data.Choices) <= 0 {
 				continue
 			}
-			mmm := llm.AssistantPromptMessage(data.Choices[0].Delta.Content)
+			mmm := llm.NewAssistantMessage(data.Choices[0].Delta.Content)
 			for _, c := range data.Choices[0].Delta.ToolCalls {
 				if c.Id == currentTool.ID {
 					currentTool.ID = c.Id

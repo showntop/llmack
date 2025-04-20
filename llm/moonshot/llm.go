@@ -26,13 +26,9 @@ type LLM struct {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.InvokeOptions) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
-	}
-	var opts llm.InvokeOptions
-	for _, o := range options {
-		o(&opts)
 	}
 
 	req := &moonshot.ChatCompletionsRequest{
@@ -82,7 +78,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 				}
 				break
 			}
-			response.Stream().Push(llm.NewChunk(0, llm.AssistantPromptMessage(msg.Content), nil))
+			response.Stream().Push(llm.NewChunk(0, llm.NewAssistantMessage(msg.Content), nil))
 		}
 	}()
 	return response, nil

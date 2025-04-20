@@ -89,9 +89,9 @@ func (m *MemoCache) Store(ctx context.Context, document *CachedDocument, value s
 	document.Answer = value
 	// document.CreatedAt = time.Now()
 	// document.UpdatedAt = time.Now()
-	if err := m.VectorStore.Store(ctx, document.ID, document.Vector); err != nil {
-		return err
-	}
+	// if err := m.VectorStore.Store(ctx, document.ID, document.Vector); err != nil {
+	// 	return err
+	// }
 	m.documentTable[document.ID] = document
 	return nil
 }

@@ -9,39 +9,37 @@ import (
 
 // predictor ...
 type predictor struct {
-	model   *llm.Instance
-	adapter Adapter
-	inputs  map[string]any
-
+	Mode      string
+	stream    bool
+	model     *llm.Instance
+	adapter   Adapter
+	inputs    map[string]any
+	memory    Memory
+	observers []llm.Message
+	tools     []any
 	Promptx
+
+	invoker Invoker
+	reponse *Response
 }
 
-// NewPredictor ...
-func NewPredictor(i string, inputs map[string]string, opts ...option) *predictor {
-
-	p := &predictor{
-		adapter: &RawAdapter{},
-		model:   defaultLLM,
-		Promptx: Promptx{Instruction: i, InputFields: make(map[string]*Field), OutputFields: make(map[string]*Field)},
-	}
-
-	for i := 0; i < len(opts); i++ {
-		opts[i](p)
-	}
-	return p
+type Invoker interface {
+	Invokex(ctx context.Context, query string) *predictor
+	Invoke(ctx context.Context, inputs map[string]any) *predictor
 }
 
-// NewPredictorWithPrompt ...
-func NewPredictorWithPrompt(prompt *Promptx, opts ...option) *predictor {
-
+func NewPredictor(opts ...option) *predictor {
 	p := &predictor{
-		adapter: &RawAdapter{},
-		model:   defaultLLM,
-		Promptx: *prompt,
+		adapter: &DefaultAdapter{},
+		Promptx: Promptx{InputFields: make(map[string]*Field), OutputFields: make(map[string]*Field)},
 	}
-
-	for i := 0; i < len(opts); i++ {
+	for i := range opts {
 		opts[i](p)
+	}
+	// default invoker
+	p.invoker = p
+	if p.model == nil {
+		p.model = defaultLLM
 	}
 	return p
 }
@@ -58,6 +56,8 @@ func Predictor(opts ...option) *predictor {
 	if p.model == nil {
 		p.model = defaultLLM
 	}
+	// default invoker
+	p.invoker = p
 
 	return p
 }
@@ -107,53 +107,76 @@ func (p *predictor) WithOutputField(tuple ...any) *predictor {
 	return p
 }
 
-// ChatWith ...
-func (p *predictor) ChatWith(inputs map[string]any) *predictor {
+func (p *predictor) WithInputs(inputs map[string]any) *predictor {
 	p.inputs = inputs
 	return p
 }
 
-// Prompt ...
-func (p *predictor) Prompt() *Promptx {
-	return &p.Promptx
+func (p *predictor) WithTools(tools ...any) *predictor {
+	p.tools = tools
+	return p
 }
 
-// Update ...
-func (p *predictor) Update(opts ...option) {
-	for i := 0; i < len(opts); i++ {
-		opts[i](p)
-	}
+func (p *predictor) WithStream(stream bool) *predictor {
+	p.stream = stream
+	return p
 }
 
-// Forward // TODO: implement forward pass
-func (p *predictor) Forward(ctx context.Context, inputs map[string]any) (any, error) {
-	var value any
-	if err := p.ChatWith(inputs).Result(ctx, &value); err != nil {
-		return value, err
+// InvokeQuery invoke forward for predicte
+func (p *predictor) InvokeQuery(ctx context.Context, query string) *predictor {
+	p.reponse = NewResponse()
+	if p.stream {
+		go p.invoker.Invokex(ctx, query)
+		return p
+	}
+	return p.invoker.Invokex(ctx, query)
+}
+
+func (p *predictor) Invokex(ctx context.Context, query string) *predictor {
+	messages, err := p.adapter.Format(p, p.inputs, p.reponse)
+	if err != nil {
+		p.reponse.err = err
+		return p
 	}
 
-	return value, nil
+	response, err := p.model.Invoke(ctx, messages,
+		llm.WithStream(true),
+	)
+	if err != nil {
+		p.reponse.err = err
+		return p
+	}
+
+	stream := response.Stream()
+
+	// 合并 message
+	answerContent := ""
+	for chunk := range stream.Next() {
+		p.reponse.stream <- chunk
+		answerContent += chunk.Choices[0].Message.Content()
+	}
+
+	p.reponse.message = llm.NewAssistantMessage(answerContent)
+	return p
 }
 
 // Invoke invoke forward for predicte
-func (p *predictor) Invoke(ctx context.Context, inputs map[string]any) *Result {
-	var value Result
-	value.p = p
-	messages, err := p.adapter.Format(p, inputs, value)
+func (p *predictor) Invoke(ctx context.Context, inputs map[string]any) *predictor {
+	messages, err := p.adapter.Format(p, inputs, p.reponse)
 	if err != nil {
-		value.err = err
-		return &value
+		p.reponse.err = err
+		return p
 	}
 	response, err := p.model.Invoke(ctx, messages,
 		llm.WithStream(true),
 	)
 	if err != nil {
-		value.err = err
-		return &value
+		p.reponse.err = err
+		return p
 	}
 	completion := response.Result().Message.Content()
-	value.completion = completion
-	return &value
+	p.reponse.message = llm.NewAssistantMessage(completion)
+	return p
 }
 
 func (r *predictor) FetchHistoryMessages(ctx context.Context) []llm.Message {

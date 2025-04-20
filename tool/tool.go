@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -33,10 +32,7 @@ func (t *Tool) Invoke(ctx context.Context, params map[string]any) (string, error
 	if t.Kind == "api" {
 		return t.invokeAPI(ctx, params)
 	}
-	if t.Kind == "code" {
-		return t.Invokex(ctx, params)
-	}
-	return "", fmt.Errorf("unknown tool kind %v", t.Kind)
+	return t.Invokex(ctx, params)
 }
 
 func (t *Tool) invokeAPI(ctx context.Context, params map[string]any) (string, error) {

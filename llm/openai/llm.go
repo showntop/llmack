@@ -26,24 +26,20 @@ type LLM struct {
 }
 
 // Invoke ...
-func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm.InvokeOption) (*llm.Response, error) {
+func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.InvokeOptions) (*llm.Response, error) {
 	if err := m.setupClient(); err != nil { // TODO sync.Once
 		return nil, err
-	}
-	var opts llm.InvokeOptions
-	for _, o := range options {
-		o(&opts)
 	}
 
 	var messagesOpenAI []openai.ChatCompletionMessageParamUnion
 	for _, m := range messages {
-		if m.Role() == llm.PromptMessageRoleSystem {
+		if m.Role() == llm.MessageRoleSystem {
 			messagesOpenAI = append(messagesOpenAI, openai.SystemMessage(m.Content()))
-		} else if m.Role() == llm.PromptMessageRoleAssistant {
+		} else if m.Role() == llm.MessageRoleAssistant {
 			messagesOpenAI = append(messagesOpenAI, openai.AssistantMessage(m.Content()))
-		} else if m.Role() == llm.PromptMessageRoleUser {
+		} else if m.Role() == llm.MessageRoleUser {
 			messagesOpenAI = append(messagesOpenAI, openai.UserMessage(m.Content()))
-		} else if m.Role() == llm.PromptMessageRoleTool {
+		} else if m.Role() == llm.MessageRoleTool {
 			messagesOpenAI = append(messagesOpenAI, openai.ToolMessage(m.Content(), m.ToolID()))
 		} else {
 			continue
@@ -80,7 +76,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, options ...llm
 		defer response.Stream().Close()
 		for stream.Next() {
 			chunk := stream.Current()
-			mmm := llm.AssistantPromptMessage(chunk.Choices[0].Delta.Content)
+			mmm := llm.NewAssistantMessage(chunk.Choices[0].Delta.Content)
 			acc.AddChunk(chunk)
 			// When this fires, the current chunk value will not contain content data
 			if _, ok := acc.JustFinishedContent(); ok {
