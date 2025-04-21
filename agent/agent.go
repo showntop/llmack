@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/showntop/llmack/llm"
@@ -101,7 +100,6 @@ func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOptio
 	if options.Stream {
 		go func() {
 			defer func() {
-				fmt.Println("--------------------------------close stream--------------------------------")
 				close(agent.response.Stream)
 			}()
 			agent.invoke(ctx, task, options.Retries, true)
@@ -154,6 +152,10 @@ func (agent *Agent) retry(ctx context.Context, task string, stream bool) (*Agent
 		WithTools(agent.Tools...).
 		WithStream(stream).
 		InvokeQuery(ctx, task)
+	if predictor.Error() != nil {
+		agent.response.Error = predictor.Error()
+		return agent.response, predictor.Error()
+	}
 	if stream {
 		for chunk := range predictor.Stream() {
 			agent.response.Stream <- chunk

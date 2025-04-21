@@ -84,6 +84,22 @@ func WithLLM(llm *llm.Instance) Option {
 	}
 }
 
+func WithAgenticSharedContext(enable bool) Option {
+	return func(a any) {
+		if at, ok := a.(*Team); ok {
+			at.agenticSharedContext = enable
+		}
+	}
+}
+
+func WithShareMemberInteractions(enable bool) Option {
+	return func(a any) {
+		if at, ok := a.(*Team); ok {
+			at.shareMemberInteractions = enable
+		}
+	}
+}
+
 func WithMode(mode TeamMode) Option {
 	return func(a any) {
 		if a, ok := a.(*Team); ok {

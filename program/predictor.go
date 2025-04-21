@@ -70,7 +70,7 @@ func (p *predictor) WithAdapter(adapter Adapter) *predictor {
 
 // WithInstruction ...
 func (p *predictor) WithInstruction(i string) *predictor {
-	p.Promptx.Instruction = i
+	p.Promptx.Instruction += "\n" + i
 	return p
 }
 
@@ -113,7 +113,7 @@ func (p *predictor) WithInputs(inputs map[string]any) *predictor {
 }
 
 func (p *predictor) WithTools(tools ...any) *predictor {
-	p.tools = tools
+	p.tools = append(p.tools, tools...)
 	return p
 }
 

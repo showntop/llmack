@@ -95,10 +95,13 @@ func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) 
 		rp.observers = append(rp.observers, llm.NewAssistantMessage(answer).WithToolCalls(toolCalls))
 		toolResults, err := rp.invokeTools(ctx, toolCalls)
 		if err != nil { // 调用工具出错
+			if rp.stream {
+				rp.reponse.stream <- llm.NewChunk(0, llm.NewAssistantMessage(err.Error()), nil)
+			}
 			rp.reponse.err = err
 			return rp.predictor, finish
 		}
-		log.InfoContextf(ctx, "program funcall invoke tools result %v", toolResults)
+		// log.InfoContextf(ctx, "program funcall invoke tools result %v", toolResults)
 		// 记录工具调用
 		for i := range toolCalls {
 			rp.observers = append(rp.observers, llm.NewToolMessage(toolResults[toolCalls[i].ID], toolCalls[i].ID))

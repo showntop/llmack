@@ -22,15 +22,17 @@ const (
 // Team A team of agents
 type Team struct {
 	Agent
-	mode     TeamMode
-	members  []*Agent
-	response *TeamRunResponse
+	mode                    TeamMode
+	members                 []*Agent
+	memory                  TeamMemory
+	response                *TeamRunResponse
+	agenticSharedContext    bool // 是否启用 agentic 模式的共享（team 所有成员）上下文
+	shareMemberInteractions bool // 是否共享成员之间的交互
 }
 
 func NewTeam(mode TeamMode, opts ...Option) *Team {
 	team := &Team{
-		mode:     mode,
-		response: &TeamRunResponse{Stream: make(chan *llm.Chunk)},
+		mode: mode,
 	}
 	for _, opt := range opts {
 		opt(team)
@@ -42,6 +44,8 @@ func NewTeam(mode TeamMode, opts ...Option) *Team {
 }
 
 func (t *Team) Invoke(ctx context.Context, query string, optfuncs ...InvokeOption) *TeamRunResponse {
+	t.response = &TeamRunResponse{Stream: make(chan *llm.Chunk, 10)}
+
 	options := &InvokeOptions{
 		Retries: 1,
 	}
@@ -58,6 +62,10 @@ func (t *Team) Invoke(ctx context.Context, query string, optfuncs ...InvokeOptio
 		prog.WithInstruction(collaboratePrompt)
 	}
 
+	if t.agenticSharedContext {
+		prog.WithInstruction(agenticSharedContextPrompt).WithTools(t.setSharedContext())
+	}
+
 	predictor := prog.WithInputs(map[string]any{
 		"name":         t.renderName(),
 		"description":  "<description>\n" + t.Description + "\n</description>",
@@ -70,15 +78,38 @@ func (t *Team) Invoke(ctx context.Context, query string, optfuncs ...InvokeOptio
 	}
 	if options.Stream {
 		go func() {
+			defer close(t.response.Stream)
 			for chunk := range predictor.Stream() {
 				t.response.Stream <- chunk
 			}
 		}()
+	} else {
+		close(t.response.Stream)
 	}
 
 	t.response.Answer = predictor.Completion()
 
 	return t.response
+}
+
+func (t *Team) setSharedContext() string {
+	fun := func(ctx context.Context, args map[string]any) (string, error) {
+		return t.memory.SetSharedContext(ctx, args["state"].(string))
+	}
+	tl := &tool.Tool{}
+	tl.Name = "setSharedContext"
+	tl.Kind = "code"
+	tl.Description = "Set or update the team's shared context with the given state."
+	tl.Parameters = append(tl.Parameters, tool.Parameter{
+		Name:          "state",
+		Type:          "string",
+		LLMDescrition: "The state to set as the team context.",
+		Required:      true,
+	})
+	tl.Invokex = fun
+	tool.Register(tl)
+
+	return tl.Name
 }
 
 func (t *Team) DebugAssignTask() string {
@@ -110,6 +141,32 @@ func (t *Team) assignTask() string {
 		if expectedOutput != "" {
 			taskInstruction += "\n\n<expected_output>\n" + expectedOutput + "\n</expected_output>"
 		}
+		// if agenticSharedContext is true, add the shared context to the task instruction
+		if t.agenticSharedContext {
+			sharedContext, err := t.memory.GetSharedContext(ctx)
+			if err != nil {
+				return "", err
+			}
+			taskInstruction += "\n\n<team_context>\n" + sharedContext + "\n</team_context>"
+		}
+
+		if t.shareMemberInteractions {
+			memberInteractions, err := t.memory.GetTeamMemberInteractions(ctx)
+			if err != nil {
+				return "", err
+			}
+
+			builder := strings.Builder{}
+			builder.WriteString("<member_interactions>\n")
+			for _, interaction := range memberInteractions {
+				builder.WriteString(fmt.Sprintf("- Member: %s\n", interaction.MemberName))
+				builder.WriteString(fmt.Sprintf("  Task: %s\n", interaction.Task))
+				builder.WriteString(fmt.Sprintf("  Response: %s\n", interaction.Response.Answer))
+			}
+			builder.WriteString("</member_interactions>\n")
+			taskInstruction += builder.String()
+		}
+
 		// run the agent
 		agentResponse := agent.Invoke(ctx, taskInstruction, WithStream(true)) // stream false for blocking util agent completion was built
 		if agentResponse.Error != nil {
@@ -126,6 +183,9 @@ func (t *Team) assignTask() string {
 		if agentResponse.Error != nil {
 			return "", agentResponse.Error
 		}
+
+		// add the agent response to the memory
+		t.memory.AddTeamMemberInteractions(ctx, agent.Name, task, agentResponse)
 		// log.InfoContextf(ctx, "agent %s completed with response: %s", agent.Name, agentResponse.Answer)
 		return agentResponse.Completion(), nil
 	}
@@ -290,4 +350,13 @@ Here are the agents in your team:
 {{description}}
 
 {{instructions}}
+`
+
+var agenticSharedContextPrompt = `
+<shared_context>
+You have access to a shared context that will be shared with all members of the team.
+Use this shared context to improve inter-agent communication and coordination.
+It is important that you update the shared context as often as possible.
+To update the shared context, use the 'set_shared_context' tool.
+</shared_context>
 `
