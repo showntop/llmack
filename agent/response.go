@@ -12,7 +12,7 @@ type TeamRunResponse struct {
 	Reasoning       string         `json:"reasoning"`
 	Answer          string         `json:"answer"`
 	ToolCalls       []llm.ToolCall `json:"tool_calls"`
-	Stream          chan any
+	Stream          chan *llm.Chunk
 	MemberResponses []*AgentRunResponse
 
 	Error error
@@ -33,19 +33,14 @@ func (t *TeamRunResponse) String() string {
 }
 
 type AgentRunResponse struct {
-	streamx chan *llm.Chunk
-
 	Reasoning string         `json:"reasoning"`
 	Answer    string         `json:"answer"`
 	ToolCalls []llm.ToolCall `json:"tool_calls"`
 	Error     error
 
-	Stream chan any
+	Stream chan *llm.Chunk
 }
 
 func (a *AgentRunResponse) Completion() string {
-	for chunk := range a.streamx {
-		a.Answer += chunk.Choices[0].Message.Content()
-	}
 	return a.Answer
 }

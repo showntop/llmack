@@ -10,7 +10,8 @@ import (
 )
 
 type Agent struct {
-	llm *llm.Instance `json:"-"` // 模型
+	llm    *llm.Instance `json:"-"` // 模型
+	stream bool          `json:"-"` // 是否流式输出
 
 	// session
 	SessionID string `json:"session_id"` // 会话ID, for 持久化信息
@@ -50,7 +51,8 @@ func NewAgent(name string, options ...Option) *Agent {
 }
 
 type InvokeOptions struct {
-	Retries int `json:"retries"` // 重试次数
+	Retries int  `json:"retries"` // 重试次数
+	Stream  bool `json:"stream"`  // 是否流式输出
 }
 
 type InvokeOption func(*InvokeOptions)
@@ -61,6 +63,30 @@ func WithRetries(retries int) InvokeOption {
 	}
 }
 
+func WithStream(stream bool) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.Stream = stream
+	}
+}
+
+func (agent *Agent) Copy() *Agent {
+	newAgent := &Agent{
+		ID:           agent.ID,
+		Name:         agent.Name,
+		Role:         agent.Role,
+		Description:  agent.Description,
+		Goals:        append([]string{}, agent.Goals...),
+		Instructions: append([]string{}, agent.Instructions...),
+		Outputs:      append([]string{}, agent.Outputs...),
+		Tools:        append([]any{}, agent.Tools...),
+		TeamID:       agent.TeamID,
+		llm:          agent.llm,
+	}
+	return newAgent
+
+}
+
+// concurrent invoke not support
 func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOption) *AgentRunResponse {
 	options := &InvokeOptions{
 		Retries: 1,
@@ -68,79 +94,75 @@ func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOptio
 	for _, opt := range opts {
 		opt(options)
 	}
+	agent.response = &AgentRunResponse{
+		Stream: make(chan *llm.Chunk, 10),
+	}
+	if options.Stream {
+		go func() {
+			defer func() {
+				close(agent.response.Stream)
+			}()
+			agent.invoke(ctx, task, options.Retries, true)
+		}()
+		return agent.response
+	} else {
+		agent.invoke(ctx, task, options.Retries, false)
+		return agent.response
+	}
+}
 
-	for range options.Retries {
-		response, err := agent.invoke(ctx, task)
+func (agent *Agent) invoke(ctx context.Context, task string, retries int, stream bool) (*AgentRunResponse, error) {
+	for range retries {
+		response, err := agent.retry(ctx, task, stream)
 		if err != nil {
 			response.Error = err
-			return response
+			return agent.response, err
 		}
 		agent.response = response
 	}
-
-	return agent.response
+	return agent.response, nil
 }
 
-// 执行 agent 返回 stream
-func (agent *Agent) invoke(ctx context.Context, task string) (*AgentRunResponse, error) {
-	var response *AgentRunResponse = &AgentRunResponse{}
-	go func() {
-		input := map[string]any{}
-		if agent.Name != "" {
-			input["name"] = "<name>\n" + agent.Name + "\n</name>"
-		}
-		if agent.Role != "" {
-			input["role"] = "<role>\n" + agent.Role + "\n</role>"
-		}
-		if agent.Description != "" {
-			input["description"] = "<description>\n" + agent.Description + "\n</description>"
-		}
-		if len(agent.Instructions) > 0 {
-			input["instructions"] = "<instructions>\n" + strings.Join(agent.Instructions, "\n") + "\n</instructions>"
-		}
-		if len(agent.Goals) > 0 {
-			input["goals"] = "<goals>\n" + strings.Join(agent.Goals, "\n") + "\n</goals>"
-		}
-		if len(agent.Outputs) > 0 {
-			input["outputs"] = "<outputs>\n" + strings.Join(agent.Outputs, "\n") + "\n</outputs>"
-		}
-		// Steps:
-		// 1. Prepare the Agent for the run
+// 迭代一次
+func (agent *Agent) retry(ctx context.Context, task string, stream bool) (*AgentRunResponse, error) {
+	input := map[string]any{}
+	if agent.Name != "" {
+		input["name"] = "<name>\n" + agent.Name + "\n</name>"
+	}
+	if agent.Role != "" {
+		input["role"] = "<role>\n" + agent.Role + "\n</role>"
+	}
+	if agent.Description != "" {
+		input["description"] = "<description>\n" + agent.Description + "\n</description>"
+	}
+	if len(agent.Instructions) > 0 {
+		input["instructions"] = "<instructions>\n" + strings.Join(agent.Instructions, "\n") + "\n</instructions>"
+	}
+	if len(agent.Goals) > 0 {
+		input["goals"] = "<goals>\n" + strings.Join(agent.Goals, "\n") + "\n</goals>"
+	}
+	if len(agent.Outputs) > 0 {
+		input["outputs"] = "<outputs>\n" + strings.Join(agent.Outputs, "\n") + "\n</outputs>"
+	}
 
-		// 2. Update the Model and resolve context
-		// 3. Read existing session from storage
-		// 4. Prepare run messages
-		// 5. Reason about the task if reasoning is enabled
-		// 6. Start the Run by yielding a RunStarted event
-		// 7. Generate a response from the Model (includes running function calls)
-		predictor := program.FunCall(
-			program.WithLLMInstance(agent.llm),
-		).WithInstruction(agentPrompt).
-			WithInputs(input).
-			WithTools(agent.Tools...).
-			InvokeQuery(ctx, task)
-
+	predictor := program.FunCall(
+		program.WithLLMInstance(agent.llm),
+	).WithInstruction(agentPrompt).
+		WithInputs(input).
+		WithTools(agent.Tools...).
+		WithStream(stream).
+		InvokeQuery(ctx, task)
+	if predictor.Error() != nil {
+		agent.response.Error = predictor.Error()
+		return agent.response, predictor.Error()
+	}
+	if stream {
 		for chunk := range predictor.Stream() {
-			response.Answer += chunk.Choices[0].Message.Content()
-			response.streamx <- chunk
-			response.Stream <- chunk
+			agent.response.Stream <- chunk
 		}
-	}()
-
-	// 8. Update RunResponse
-	// 9. Update Agent Memory
-	// 10. Calculate session metrics
-	// 11. Save session to storage
-	// 12. Save output to file if save_response_to_file is set
-	// if len(result.ToolCalls()) > 0 {
-	// 	toolResults, err := agent.invokeTools(ctx, result.ToolCalls())
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// }
-
-	return response, nil
+	}
+	agent.response.Answer = predictor.Response().Completion()
+	return agent.response, nil
 }
 
 var (

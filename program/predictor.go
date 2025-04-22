@@ -70,7 +70,7 @@ func (p *predictor) WithAdapter(adapter Adapter) *predictor {
 
 // WithInstruction ...
 func (p *predictor) WithInstruction(i string) *predictor {
-	p.Promptx.Instruction = i
+	p.Promptx.Instruction += "\n" + i
 	return p
 }
 
@@ -113,7 +113,7 @@ func (p *predictor) WithInputs(inputs map[string]any) *predictor {
 }
 
 func (p *predictor) WithTools(tools ...any) *predictor {
-	p.tools = tools
+	p.tools = append(p.tools, tools...)
 	return p
 }
 
@@ -153,7 +153,7 @@ func (p *predictor) Invokex(ctx context.Context, query string) *predictor {
 	answerContent := ""
 	for chunk := range stream.Next() {
 		p.reponse.stream <- chunk
-		answerContent += chunk.Choices[0].Message.Content()
+		answerContent += chunk.Choices[0].Delta.Content()
 	}
 
 	p.reponse.message = llm.NewAssistantMessage(answerContent)
