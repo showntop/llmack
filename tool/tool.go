@@ -28,6 +28,36 @@ type Tool struct {
 	Invokex func(context.Context, map[string]any) (string, error)
 }
 
+type Option func(*Tool)
+
+func New(opts ...Option) *Tool {
+	t := &Tool{
+		Kind: "code",
+	}
+	for _, opt := range opts {
+		opt(t)
+	}
+	return t
+}
+
+func WithKind(kind string) Option {
+	return func(t *Tool) {
+		t.Kind = kind
+	}
+}
+
+func WithName(name string) Option {
+	return func(t *Tool) {
+		t.Name = name
+	}
+}
+
+func WithDescription(description string) Option {
+	return func(t *Tool) {
+		t.Description = description
+	}
+}
+
 func (t *Tool) Invoke(ctx context.Context, params map[string]any) (string, error) {
 	if t.Kind == "api" {
 		return t.invokeAPI(ctx, params)
