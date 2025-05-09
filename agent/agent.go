@@ -2,14 +2,17 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/llm/deepseek"
 	"github.com/showntop/llmack/program"
+	"github.com/showntop/llmack/rag"
 )
 
 type Agent struct {
+	ragrtv *rag.Indexer  `json:"-"` // rag indexer
 	llm    *llm.Instance `json:"-"` // 模型
 	stream bool          `json:"-"` // 是否流式输出
 
@@ -126,23 +129,41 @@ func (agent *Agent) invoke(ctx context.Context, task string, retries int, stream
 // 迭代一次
 func (agent *Agent) retry(ctx context.Context, task string, stream bool) (*AgentRunResponse, error) {
 	input := map[string]any{}
+	agentPrompt := ""
 	if agent.Name != "" {
-		input["name"] = "<name>\n" + agent.Name + "\n</name>"
+		agentPrompt += "\n<name>\n" + agent.Name + "\n</name>\n"
 	}
 	if agent.Role != "" {
-		input["role"] = "<role>\n" + agent.Role + "\n</role>"
+		agentPrompt += "\n<role>\n" + agent.Role + "\n</role>\n"
 	}
 	if agent.Description != "" {
-		input["description"] = "<description>\n" + agent.Description + "\n</description>"
+		agentPrompt += "\n<description>\n" + agent.Description + "\n</description>\n"
 	}
 	if len(agent.Instructions) > 0 {
-		input["instructions"] = "<instructions>\n" + strings.Join(agent.Instructions, "\n") + "\n</instructions>"
+		agentPrompt += "\n<instructions>\n" + strings.Join(agent.Instructions, "\n") + "\n</instructions>\n"
 	}
 	if len(agent.Goals) > 0 {
-		input["goals"] = "<goals>\n" + strings.Join(agent.Goals, "\n") + "\n</goals>"
+		agentPrompt += "\n<goals>\n" + strings.Join(agent.Goals, "\n") + "\n</goals>\n"
 	}
 	if len(agent.Outputs) > 0 {
-		input["outputs"] = "<outputs>\n" + strings.Join(agent.Outputs, "\n") + "\n</outputs>"
+		agentPrompt += "\n<outputs>\n" + strings.Join(agent.Outputs, "\n") + "\n</outputs>\n"
+	}
+
+	if agent.ragrtv != nil {
+		knowledges, err := agent.ragrtv.Retrieve(ctx, task, rag.WithTopK(10))
+		if err != nil {
+			agent.response.Error = err
+			return agent.response, err
+		}
+		if len(knowledges) > 0 {
+			jsonKnowledges, err := json.Marshal(knowledges)
+			if err != nil {
+				agent.response.Error = err
+				return agent.response, err
+			}
+			task += "\n\nReference the following knowledges from the knowledge base if it helps:\n"
+			task += "<knowledges>\n" + string(jsonKnowledges) + "\n</knowledges>\n"
+		}
 	}
 
 	predictor := program.FunCall(

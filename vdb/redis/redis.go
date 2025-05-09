@@ -70,7 +70,7 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 
 	// 应用搜索选项
 	options := &vdb.SearchOptions{
-		Topk:      10,
+		TopK:      10,
 		Threshold: 0.5,
 	}
 	for _, opt := range opts {
@@ -78,13 +78,13 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	}
 
 	// 构建向量搜索查询
-	query := fmt.Sprintf("*=>[KNN %d @vector $BLOB AS score]", options.Topk)
+	query := fmt.Sprintf("*=>[KNN %d @vector $BLOB AS score]", options.TopK)
 
 	// 执行搜索
 	res := r.client.Do(ctx, "FT.SEARCH", r.index, query,
 		"PARAMS", "2", "BLOB", vectorToBytes(vector),
 		"RETURN", "4", "id", "query", "answer", "score",
-		"LIMIT", "0", strconv.Itoa(options.Topk),
+		"LIMIT", "0", strconv.Itoa(options.TopK),
 	)
 
 	if res.Err() != nil {

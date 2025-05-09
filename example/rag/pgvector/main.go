@@ -3,53 +3,45 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
-	"github.com/redis/go-redis/v9"
-	"github.com/showntop/llmack/rag"
+	"github.com/joho/godotenv"
+	"github.com/showntop/llmack/embedding"
 	"github.com/showntop/llmack/vdb"
-	vredis "github.com/showntop/llmack/vdb/redis"
+	"github.com/showntop/llmack/vdb/pgvector"
 )
 
 func main() {
+	godotenv.Load()
 
-	ctx := context.Background()
-
-	config := &vredis.Config{}
-	config.Addr = "127.0.0.1:6379"
-	config.Password = "cdgxxx2025@tx"
-	config.DB = 0
-	config.Index = "vdb"
-	// config = 1536
-	config.FieldSchema = []*redis.FieldSchema{
-		{},
-	}
-
-	indexer, err := rag.NewIndexer(vredis.Name, config)
-	if err != nil {
-		panic(err)
-	}
-	indexer.Index(ctx, mockDocuments(), &rag.Options{
-		LibraryID:      1,
-		Kind:           "text",
-		IndexID:        1,
-		TopK:           10,
-		ScoreThreshold: 0.5,
-	})
-
-	entities, err := indexer.Retrieve(ctx, "你好", &rag.Options{
-		LibraryID:      1,
-		Kind:           "text",
-		IndexID:        1,
-		TopK:           10,
-		ScoreThreshold: 0.5,
+	vvv, err := pgvector.New(&pgvector.Config{
+		DNS:      os.Getenv("pgvector_dns"),
+		Embedder: embedding.NewStringEmbedder(),
+		Table:    "knowledges",
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(entities)
+	// err = vvv.Create(context.Background())
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// err = vvv.Store(context.Background(), mockDocuments()...)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	docs, err := vvv.SearchQuery(context.Background(), "埃菲尔铁塔", vdb.WithTopk(2))
+	if err != nil {
+		panic(err)
+	}
+	for _, doc := range docs {
+		fmt.Println(doc.ID, doc.Title, doc.Content, doc.Embedding)
+	}
 }
 
 func mockDocuments() []*vdb.Document {
@@ -72,7 +64,7 @@ func mockDocuments() []*vdb.Document {
 			continue
 		}
 		docs = append(docs, &vdb.Document{
-			ID:      strconv.FormatInt(int64(idx+1), 10),
+			ID:      strconv.FormatInt(int64(idx+1), 10) + "X",
 			Content: str,
 		})
 	}

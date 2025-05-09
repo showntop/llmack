@@ -15,7 +15,7 @@ type CachedDocument struct {
 	Query  string
 	Answer string
 	Score  float64
-	Vector []float64
+	Vector []float32
 }
 
 // CacheFactory ...
