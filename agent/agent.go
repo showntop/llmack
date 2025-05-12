@@ -4,17 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
+	"slices"
+
+	"github.com/google/uuid"
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/llm/deepseek"
 	"github.com/showntop/llmack/program"
 	"github.com/showntop/llmack/rag"
+	"github.com/showntop/llmack/storage"
 )
 
 type Agent struct {
-	ragrtv *rag.Indexer  `json:"-"` // rag indexer
-	llm    *llm.Instance `json:"-"` // 模型
-	stream bool          `json:"-"` // 是否流式输出
+	storage storage.Storage `json:"-"` // 存储
+	ragrtv  *rag.Indexer    `json:"-"` // rag indexer
+	llm     *llm.Instance   `json:"-"` // 模型
+	stream  bool            `json:"-"` // 是否流式输出
 
 	// session
 	SessionID string `json:"session_id"` // 会话ID, for 持久化信息
@@ -54,11 +60,18 @@ func NewAgent(name string, options ...Option) *Agent {
 }
 
 type InvokeOptions struct {
-	Retries int  `json:"retries"` // 重试次数
-	Stream  bool `json:"stream"`  // 是否流式输出
+	SessionID string `json:"session_id"` // 会话ID, for 持久化信息
+	Retries   int    `json:"retries"`    // 重试次数
+	Stream    bool   `json:"stream"`     // 是否流式输出
 }
 
 type InvokeOption func(*InvokeOptions)
+
+func WithSessionID(sessionID string) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.SessionID = sessionID
+	}
+}
 
 func WithRetries(retries int) InvokeOption {
 	return func(o *InvokeOptions) {
@@ -78,12 +91,13 @@ func (agent *Agent) Copy() *Agent {
 		Name:         agent.Name,
 		Role:         agent.Role,
 		Description:  agent.Description,
-		Goals:        append([]string{}, agent.Goals...),
+		Goals:        slices.Clone(agent.Goals),
 		Instructions: append([]string{}, agent.Instructions...),
 		Outputs:      append([]string{}, agent.Outputs...),
 		Tools:        append([]any{}, agent.Tools...),
 		TeamID:       agent.TeamID,
 		llm:          agent.llm,
+		storage:      agent.storage,
 	}
 	return newAgent
 
@@ -93,6 +107,7 @@ func (agent *Agent) Copy() *Agent {
 func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOption) *AgentRunResponse {
 	options := &InvokeOptions{
 		Retries: 1,
+		Stream:  true,
 	}
 	for _, opt := range opts {
 		opt(options)
@@ -100,23 +115,41 @@ func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOptio
 	agent.response = &AgentRunResponse{
 		Stream: make(chan *llm.Chunk, 10),
 	}
+	// fetch or create a new session
+	session, err := agent.fetchOrCreateSession(ctx, options.SessionID)
+	if err != nil {
+		agent.response.Error = err
+		return agent.response
+	}
+	_ = session
 	if options.Stream {
 		go func() {
 			defer func() {
 				close(agent.response.Stream)
 			}()
-			agent.invoke(ctx, task, options.Retries, true)
+			agent.invoke(ctx, task, options)
 		}()
 		return agent.response
 	} else {
-		agent.invoke(ctx, task, options.Retries, false)
+		agent.invoke(ctx, task, options)
 		return agent.response
 	}
 }
 
-func (agent *Agent) invoke(ctx context.Context, task string, retries int, stream bool) (*AgentRunResponse, error) {
-	for range retries {
-		response, err := agent.retry(ctx, task, stream)
+func (agent *Agent) invoke(ctx context.Context, task string, options *InvokeOptions) (*AgentRunResponse, error) {
+
+	// defer agent.storage.UpdateSession(ctx, &storage.Session{
+	// 	ID:         session.ID,
+	// 	EngineID:   agent.ID,
+	// 	EngineType: "agent" + "(" + agent.Name + ")",
+	// 	EngineData: map[string]any{
+	// 		"task": task,
+	// 	},
+	// 	CreatedAt: time.Now(),
+	// 	UpdatedAt: time.Now(),
+	// })
+	for range options.Retries {
+		response, err := agent.retry(ctx, task, options.Stream)
 		if err != nil {
 			response.Error = err
 			return agent.response, err
@@ -184,6 +217,33 @@ func (agent *Agent) retry(ctx context.Context, task string, stream bool) (*Agent
 	}
 	agent.response.Answer = predictor.Response().Completion()
 	return agent.response, nil
+}
+
+func (agent *Agent) fetchOrCreateSession(ctx context.Context, sessionID string) (*storage.Session, error) {
+	if agent.storage == nil { // no storage just in memory
+		return nil, nil
+	}
+	if sessionID == "" {
+		sessionID = uuid.NewString()
+		session := &storage.Session{
+			ID:         sessionID,
+			EngineID:   agent.ID,
+			EngineType: "agent" + "(" + agent.Name + ")",
+			EngineData: map[string]any{},
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+		if err := agent.storage.SaveSession(ctx, session); err != nil {
+			return nil, err
+		}
+		return session, nil
+	}
+	session, err := agent.storage.FetchSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return session, nil
 }
 
 var (

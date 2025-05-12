@@ -48,9 +48,16 @@ func (t *Team) Invoke(ctx context.Context, query string, optfuncs ...InvokeOptio
 
 	options := &InvokeOptions{
 		Retries: 1,
+		Stream:  true,
 	}
 	for _, opt := range optfuncs {
 		opt(options)
+	}
+
+	_, err := t.fetchOrCreateSession(ctx, options.SessionID)
+	if err != nil {
+		t.response.Error = err
+		return t.response
 	}
 
 	prog := program.FunCall(program.WithLLMInstance(t.llm)).WithStream(options.Stream)

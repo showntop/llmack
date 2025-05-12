@@ -3,6 +3,7 @@ package agent
 import (
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/rag"
+	"github.com/showntop/llmack/storage"
 )
 
 type Option func(any)
@@ -125,6 +126,16 @@ func WithMembers(members ...*Agent) Option {
 	return func(a any) {
 		if a, ok := a.(*Team); ok {
 			a.members = members
+		}
+	}
+}
+
+func WithStorage(storage storage.Storage) Option {
+	return func(a any) {
+		if at, ok := a.(*Team); ok {
+			at.storage = storage
+		} else if aa, ok := a.(*Agent); ok {
+			aa.storage = storage
 		}
 	}
 }
