@@ -25,7 +25,7 @@ func NewRetrival(name string, config any) (*Retrival, error) {
 }
 
 // Retrieve TODO: 实现检索逻辑
-func (r *Retrival) Retrieve(ctx context.Context, query string, opts *Options) ([]KnowledgeEntity, error) {
+func (r *Retrival) Retrieve(ctx context.Context, query string, opts *SearchOptions) ([]*vdb.Document, error) {
 	log.InfoContextf(ctx, "Retrieve knowledge: %v query: %s options: %+v", opts.LibraryID, query, opts)
 
 	// return r.vdb.Search(ctx, query, opts)

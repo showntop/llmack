@@ -55,7 +55,7 @@ func New(cfg Config) (*VDB, error) {
 func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOption) ([]vdb.Document, error) {
 	// 应用搜索选项
 	options := &vdb.SearchOptions{
-		Topk:      10,
+		TopK:      10,
 		Threshold: 0.5,
 	}
 	for _, opt := range opts {
@@ -78,7 +78,7 @@ func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 		[]entity.Vector{}, // search vectors
 		"id",              // vector fields
 		entity.L2,         // metric type
-		options.Topk,      // topK
+		options.TopK,      // topK
 		sp,                // search param
 	)
 	if err != nil {

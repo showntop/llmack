@@ -24,17 +24,29 @@ func NewIndexer(name string, config any) (*Indexer, error) {
 }
 
 // Retrieve TODO: 实现检索逻辑
-func (r *Indexer) Retrieve(ctx context.Context, query string, opts *Options) ([]KnowledgeEntity, error) {
-	log.InfoContextf(ctx, "Retrieve knowledge: %v query: %s options: %+v", opts.LibraryID, query, opts)
+func (r *Indexer) Retrieve(ctx context.Context, query string, opts ...SearchOption) ([]*vdb.Document, error) {
+	searchOpts := &SearchOptions{}
+	for _, opt := range opts {
+		opt(searchOpts)
+	}
+	log.InfoContextf(ctx, "Retrieve knowledge: %v query: %s options: %+v", searchOpts.LibraryID, query, searchOpts)
 
-	// return r.vdb.Search(ctx, query, opts)
-	return nil, nil
+	vdbSearchOpts := &vdb.SearchOptions{
+		TopK:      searchOpts.TopK,
+		Threshold: searchOpts.ScoreThreshold,
+	}
+	docs, err := r.vdb.SearchQueryWithOptions(ctx, query, vdbSearchOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	return docs, nil
 }
 
-func (r *Indexer) Index(ctx context.Context, docs []*vdb.Document, opts *Options) ([]KnowledgeEntity, error) {
+func (r *Indexer) Index(ctx context.Context, docs []*vdb.Document, opts *SearchOptions) ([]*vdb.Document, error) {
 	log.InfoContextf(ctx, "Index documents %+v with options %+v", docs, opts)
 	// 将知识库中的数据转换为向量
-	if err := r.vdb.Store(ctx, docs); err != nil {
+	if err := r.vdb.Store(ctx, docs...); err != nil {
 		return nil, err
 	}
 

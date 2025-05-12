@@ -11,21 +11,21 @@ var NewStringEmbedder = func() Embedder {
 	return StringEmbedder{}
 }
 
-// Embed 将文本转换为 32 维向量
-func (s StringEmbedder) Embed(ctx context.Context, text string) ([]float64, error) {
-	// 1. 定义固定向量长度（例如32维）
-	vectorSize := 32
-	result := make([]float64, vectorSize)
+// Embed 将文本转换为固定维度的向量
+func (s StringEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
+	// 1. 固定向量长度
+	vectorSize := s.Dimension()
+	result := make([]float32, vectorSize)
 
 	// 2. 获取字符串的字节
 	bytes := []byte(text)
 
 	// 3. 使用字节生成向量
-	for i := 0; i < vectorSize; i++ {
-		var sum float64 = 0
+	for i := range vectorSize {
+		var sum float32 = 0
 		// 对每个位置，使用一组字节计算一个float值
 		for j := i; j < len(bytes); j += vectorSize {
-			sum += float64(bytes[j%len(bytes)])
+			sum += float32(bytes[j%len(bytes)])
 		}
 		result[i] = sum
 	}
@@ -34,8 +34,8 @@ func (s StringEmbedder) Embed(ctx context.Context, text string) ([]float64, erro
 }
 
 // BatchEmbed 批量将多个文本转换为向量
-func (s StringEmbedder) BatchEmbed(ctx context.Context, texts []string) ([][]float64, error) {
-	results := make([][]float64, len(texts))
+func (s StringEmbedder) BatchEmbed(ctx context.Context, texts []string) ([][]float32, error) {
+	results := make([][]float32, len(texts))
 	for i, text := range texts {
 		embedding, err := s.Embed(ctx, text)
 		if err != nil {

@@ -1,6 +1,10 @@
 package agent
 
-import "github.com/showntop/llmack/llm"
+import (
+	"github.com/showntop/llmack/llm"
+	"github.com/showntop/llmack/rag"
+	"github.com/showntop/llmack/storage"
+)
 
 type Option func(any)
 
@@ -30,6 +34,16 @@ func WithDescription(description string) Option {
 			ax.Description = description
 		} else if at, ok := a.(*Team); ok {
 			at.Description = description
+		}
+	}
+}
+
+func WithKnowledge(retrieval *rag.Indexer) Option {
+	return func(a any) {
+		if aa, ok := a.(*Agent); ok {
+			aa.ragrtv = retrieval
+		} else if at, ok := a.(*Team); ok {
+			at.ragrtv = retrieval
 		}
 	}
 }
@@ -112,6 +126,16 @@ func WithMembers(members ...*Agent) Option {
 	return func(a any) {
 		if a, ok := a.(*Team); ok {
 			a.members = members
+		}
+	}
+}
+
+func WithStorage(storage storage.Storage) Option {
+	return func(a any) {
+		if at, ok := a.(*Team); ok {
+			at.storage = storage
+		} else if aa, ok := a.(*Agent); ok {
+			aa.storage = storage
 		}
 	}
 }
