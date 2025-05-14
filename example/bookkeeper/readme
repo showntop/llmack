@@ -1,0 +1,79 @@
+# AI 记账助手
+
+一个基于 AI 的智能记账工具，可以帮助用户通过对话方式记录和管理日常收支。
+
+## 功能特点
+
+- 支持通过对话方式记录收支
+- 支持上传消费截图，自动识别金额和类别
+- 提供消费分析和预算管理建议
+- 支持导出消费明细报表
+- 提供投资理财建议
+
+## 技术栈
+
+### 后端
+- Go
+- Gin Web 框架
+- GORM ORM 框架
+- PostgreSQL 数据库
+- LLMACK AI 框架
+
+### 前端
+- React
+- TypeScript
+- Material-UI
+- Vite
+
+## 快速开始
+
+### 后端设置
+
+1. 安装 PostgreSQL 数据库
+2. 创建数据库：
+```sql
+CREATE DATABASE bookkeeper;
+```
+
+3. 配置数据库连接：
+编辑 `config/config.yaml` 文件，设置数据库连接信息
+
+4. 运行后端服务：
+```bash
+cd bookkeeper
+go mod tidy
+go run main.go
+```
+
+### 前端设置
+
+1. 安装依赖：
+```bash
+cd bookkeeper-web
+npm install
+```
+
+2. 运行开发服务器：
+```bash
+npm run dev
+```
+
+## API 文档
+
+### 交易记录 API
+
+- POST /api/transactions - 创建新的交易记录
+- GET /api/transactions - 获取交易记录列表
+- GET /api/transactions/analysis - 获取交易分析数据
+
+## 贡献指南
+
+1. Fork 项目
+2. 创建特性分支
+3. 提交更改
+4. 推送到分支
+5. 创建 Pull Request
+
+## 许可证
+
+MIT

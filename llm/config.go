@@ -1,6 +1,8 @@
 package llm
 
-import "os"
+import (
+	"os"
+)
 
 // ConfigSupplier ...
 type ConfigSupplier interface {
