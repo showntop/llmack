@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/showntop/llmack/llm"
+	"github.com/showntop/llmack/memory"
 	"github.com/showntop/llmack/rag"
 	"github.com/showntop/llmack/storage"
 )
@@ -136,6 +137,14 @@ func WithStorage(storage storage.Storage) Option {
 			at.storage = storage
 		} else if aa, ok := a.(*Agent); ok {
 			aa.storage = storage
+		}
+	}
+}
+
+func WithMemory(memory memory.Memory) Option {
+	return func(a any) {
+		if at, ok := a.(*Agent); ok {
+			at.memory = memory
 		}
 	}
 }

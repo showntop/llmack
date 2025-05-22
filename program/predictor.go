@@ -14,7 +14,6 @@ type predictor struct {
 	model     *llm.Instance
 	adapter   Adapter
 	inputs    map[string]any
-	memory    Memory
 	observers []llm.Message
 	tools     []any
 	Promptx

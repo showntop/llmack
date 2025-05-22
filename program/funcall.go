@@ -151,12 +151,6 @@ func (rp *funcall) renderPromptMessages(ctx context.Context, preset string,
 
 	messages = append(messages, llm.NewUserTextMessage(presetPrompt))
 
-	// if memory from history
-	if rp.memory != nil {
-		histories := rp.FetchHistoryMessages(ctx)
-		messages = append(messages, histories...)
-	}
-
 	messages = append(messages, rp.observers...)
 	return messages, nil
 }
