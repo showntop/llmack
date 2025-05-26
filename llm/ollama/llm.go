@@ -35,8 +35,7 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.Invo
 		return nil, err
 	}
 
-	var response *llm.Response = new(llm.Response)
-	response = response.MakeStream()
+	response := llm.NewStreamResponse()
 	req := &api.ChatRequest{
 		Model:  opts.Model,
 		Stream: &opts.Stream,

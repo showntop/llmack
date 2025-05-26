@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/llm/deepseek"
+	"github.com/showntop/llmack/log"
+	"github.com/showntop/llmack/memory"
 	"github.com/showntop/llmack/program"
 	"github.com/showntop/llmack/rag"
 	"github.com/showntop/llmack/storage"
@@ -27,6 +29,7 @@ type Agent struct {
 	// context
 
 	// memory
+	memory memory.Memory `json:"-"` // 记忆
 
 	// basic
 	ID   string `json:"id"` // 唯一标识
@@ -107,7 +110,7 @@ func (agent *Agent) Copy() *Agent {
 func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOption) *AgentRunResponse {
 	options := &InvokeOptions{
 		Retries: 1,
-		Stream:  true,
+		Stream:  false,
 	}
 	for _, opt := range opts {
 		opt(options)
@@ -115,13 +118,6 @@ func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOptio
 	agent.response = &AgentRunResponse{
 		Stream: make(chan *llm.Chunk, 10),
 	}
-	// fetch or create a new session
-	session, err := agent.fetchOrCreateSession(ctx, options.SessionID)
-	if err != nil {
-		agent.response.Error = err
-		return agent.response
-	}
-	_ = session
 	if options.Stream {
 		go func() {
 			defer func() {
@@ -137,17 +133,27 @@ func (agent *Agent) Invoke(ctx context.Context, task string, opts ...InvokeOptio
 }
 
 func (agent *Agent) invoke(ctx context.Context, task string, options *InvokeOptions) (*AgentRunResponse, error) {
+	// fetch or create a new session
+	session, err := agent.fetchOrCreateSession(ctx, options.SessionID)
+	if err != nil {
+		agent.response.Error = err
+		return agent.response, err
+	}
 
-	// defer agent.storage.UpdateSession(ctx, &storage.Session{
-	// 	ID:         session.ID,
-	// 	EngineID:   agent.ID,
-	// 	EngineType: "agent" + "(" + agent.Name + ")",
-	// 	EngineData: map[string]any{
-	// 		"task": task,
-	// 	},
-	// 	CreatedAt: time.Now(),
-	// 	UpdatedAt: time.Now(),
-	// })
+	agent.SessionID = session.ID
+
+	defer func() { //  Update Agent Memory
+		log.DebugContextf(ctx, "agent response:\n")
+		log.DebugContextf(ctx, "===============================\n %s", agent.response.Answer)
+		log.DebugContextf(ctx, "===============================")
+		if agent.memory != nil {
+			agent.memory.Add(ctx, session.ID, memory.NewMemoryItem(session.ID, task, nil))
+		}
+		if agent.storage != nil {
+			agent.storage.UpdateSession(ctx, session)
+		}
+	}()
+
 	for range options.Retries {
 		response, err := agent.retry(ctx, task, options.Stream)
 		if err != nil {
@@ -180,6 +186,27 @@ func (agent *Agent) retry(ctx context.Context, task string, stream bool) (*Agent
 	}
 	if len(agent.Outputs) > 0 {
 		agentPrompt += "\n<outputs>\n" + strings.Join(agent.Outputs, "\n") + "\n</outputs>\n"
+	}
+
+	if agent.memory != nil {
+		items, err := agent.memory.Get(ctx, agent.SessionID)
+		if err != nil {
+			agent.response.Error = err
+			return agent.response, err
+		}
+		if len(items) > 0 {
+			agentPrompt += "You have access to memories from previous interactions with the user that you can use:\n\n"
+			agentPrompt += "<memories_from_previous_interactions>"
+			for _, item := range items {
+				agentPrompt += "\n- " + item.Content
+			}
+			agentPrompt += "\n</memories_from_previous_interactions>\n\n"
+			agentPrompt += "Note: this information is from previous interactions and may be updated in this conversation. "
+			agentPrompt += "You should always prefer information from this conversation over the past memories.\n"
+		} else {
+			agentPrompt += "You have the capability to retain memories from previous interactions with the user, "
+			agentPrompt += "but have not had any interactions with the user yet.\n"
+		}
 	}
 
 	if agent.ragrtv != nil {
@@ -220,9 +247,7 @@ func (agent *Agent) retry(ctx context.Context, task string, stream bool) (*Agent
 }
 
 func (agent *Agent) fetchOrCreateSession(ctx context.Context, sessionID string) (*storage.Session, error) {
-	if agent.storage == nil { // no storage just in memory
-		return nil, nil
-	}
+
 	if sessionID == "" {
 		sessionID = uuid.NewString()
 		session := &storage.Session{
@@ -233,11 +258,26 @@ func (agent *Agent) fetchOrCreateSession(ctx context.Context, sessionID string) 
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		}
+		if agent.storage == nil { // no storage just in memory
+			return session, nil
+		}
 		if err := agent.storage.SaveSession(ctx, session); err != nil {
 			return nil, err
 		}
 		return session, nil
 	}
+
+	if agent.storage == nil { // no storage just in memory
+		return &storage.Session{
+			ID:         sessionID,
+			EngineID:   agent.ID,
+			EngineType: "agent" + "(" + agent.Name + ")",
+			EngineData: map[string]any{},
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}, nil
+	}
+
 	session, err := agent.storage.FetchSession(ctx, sessionID)
 	if err != nil {
 		return nil, err

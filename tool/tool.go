@@ -58,6 +58,18 @@ func WithDescription(description string) Option {
 	}
 }
 
+func WithParameters(parameters []Parameter) Option {
+	return func(t *Tool) {
+		t.Parameters = parameters
+	}
+}
+
+func WithFunction(function func(ctx context.Context, args map[string]any) (string, error)) Option {
+	return func(t *Tool) {
+		t.Invokex = function
+	}
+}
+
 func (t *Tool) Invoke(ctx context.Context, params map[string]any) (string, error) {
 	if t.Kind == "api" {
 		return t.invokeAPI(ctx, params)

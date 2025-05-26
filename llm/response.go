@@ -20,18 +20,6 @@ func NewStreamResponse() *Response {
 	}
 }
 
-// MakeResult ...
-func (resp *Response) MakeResult() *Response {
-	resp.result = &Result{}
-	return resp
-}
-
-// MakeStream ...
-func (resp *Response) MakeStream() *Response {
-	resp.stream = NewStream()
-	return resp
-}
-
 // Stream ...
 func (resp *Response) Stream() *Stream {
 	return resp.stream
@@ -39,6 +27,9 @@ func (resp *Response) Stream() *Stream {
 
 // Result ...
 func (resp *Response) Result() *Result {
+	if resp.result != nil {
+		return resp.result
+	}
 	resp.result = &Result{}
 	// 合并 message
 	text := ""

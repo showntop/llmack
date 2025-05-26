@@ -2,161 +2,309 @@ package milvus
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
+
+	"github.com/showntop/llmack/embedding"
+	"github.com/showntop/llmack/vdb"
 
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
-
-	"github.com/showntop/llmack/vdb"
 )
 
-// VDB ...
-type VDB struct {
-	client     client.Client
-	collection string
-	dimension  int
+// 注册构造函数
+func init() {
+	vdb.Register("milvus", func(config any) (vdb.VDB, error) {
+		cfg, ok := config.(*Config)
+		if !ok {
+			return nil, fmt.Errorf("invalid config type")
+		}
+		return New(cfg)
+	})
 }
 
-type FieldConfig struct {
-	Name      string
-	Type      entity.FieldType
-	IsPrimary bool
-	IsAuto    bool
+// MilvusVDB 封装 Milvus 客户端
+type MilvusVDB struct {
+	client client.Client
+	config *Config
 }
 
+// Config Milvus 配置
 type Config struct {
-	Address     string
-	Collection  string
-	Description string
-	Dimension   int
-	ShareNum    int
-	Fields      []FieldConfig
+	Address        string `json:"address"`
+	Client         client.Client
+	CollectionName string `json:"collection_name"`
+	Dim            int    `json:"dim"`
+	Embedder       embedding.Embedder
+	Distance       vdb.Distance
 }
 
-// New 创建新的Milvus向量存储实例
-func New(cfg Config) (*VDB, error) {
-	c, err := client.NewGrpcClient(context.Background(), cfg.Address)
+// New 创建新的 Milvus
+func New(config *Config) (*MilvusVDB, error) {
+	ctx := context.Background()
+
+	var cc client.Client
+	if config.Client != nil {
+		cc = config.Client
+	} else {
+		var err error
+		cc, err = client.NewGrpcClient(ctx, config.Address)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to Milvus: %v", err)
+		}
+	}
+	return &MilvusVDB{
+		client: cc,
+		config: config,
+	}, nil
+}
+
+// Create 创建集合
+func (m *MilvusVDB) Create(ctx context.Context) error {
+	if m.config.CollectionName == "" {
+		return fmt.Errorf("collection name is required")
+	}
+	has, err := m.client.HasCollection(ctx, m.config.CollectionName)
 	if err != nil {
-		return nil, fmt.Errorf("connect milvus: %w", err)
+		return err
+	}
+	if has {
+		return nil
 	}
 
-	db := &VDB{
-		client:     c,
-		collection: cfg.Collection,
-		dimension:  cfg.Dimension,
+	schema := &entity.Schema{
+		CollectionName: m.config.CollectionName,
+		Description:    "Collection for document search",
+		Fields: []*entity.Field{
+			{
+				Name:       "id",
+				DataType:   entity.FieldTypeVarChar,
+				PrimaryKey: true,
+				AutoID:     false,
+				TypeParams: map[string]string{
+					"max_length": "65535",
+				},
+			},
+			{
+				Name:     "title",
+				DataType: entity.FieldTypeVarChar,
+				TypeParams: map[string]string{
+					"max_length": "65535",
+				},
+			},
+			{
+				Name:     "content",
+				DataType: entity.FieldTypeVarChar,
+				TypeParams: map[string]string{
+					"max_length": "65535",
+				},
+			},
+			{
+				Name:     "content_hash",
+				DataType: entity.FieldTypeVarChar,
+				TypeParams: map[string]string{
+					"max_length": "512",
+				},
+			},
+			{
+				Name:     "vector",
+				DataType: entity.FieldTypeFloatVector,
+				TypeParams: map[string]string{
+					"dim": fmt.Sprintf("%d", m.config.Dim),
+				},
+			},
+			{
+				Name:     "metadata",
+				DataType: entity.FieldTypeJSON,
+			},
+			{
+				Name:     "created_at",
+				DataType: entity.FieldTypeInt64,
+			},
+			{
+				Name:     "updated_at",
+				DataType: entity.FieldTypeInt64,
+			},
+		},
 	}
-	return db, nil
+
+	if err := m.client.CreateCollection(ctx, schema, 2,
+		client.WithMetricsType(metricsType(m.config.Distance)),
+	); err != nil {
+		return err
+	}
+
+	idx, _ := entity.NewIndexIvfFlat(metricsType(m.config.Distance), 128)
+	if err := m.client.CreateIndex(ctx, m.config.CollectionName, "vector",
+		idx,
+		true,
+	); err != nil {
+		return err
+	}
+	return nil
 }
 
-// Search ...
-// @param ctx 上下文
-// @param vector 查询向量
-// @param opts 搜索选项
-func (m *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOption) ([]vdb.Document, error) {
-	// 应用搜索选项
+// Store 存储文档
+func (m *MilvusVDB) Store(ctx context.Context, docs ...*vdb.Document) error {
+	if len(docs) == 0 {
+		return nil
+	}
+
+	// 准备数据
+	ids := make([]string, len(docs))
+	titles := make([]string, len(docs))
+	contents := make([]string, len(docs))
+	hashes := make([]string, len(docs))
+	vectors := make([][]float32, len(docs))
+	metadatas := make([][]byte, len(docs))
+	createdAts := make([]int64, len(docs))
+	updatedAts := make([]int64, len(docs))
+
+	for i, doc := range docs {
+		ids[i] = doc.ID
+		titles[i] = doc.Title
+		contents[i] = doc.Content
+		hashes[i] = doc.ContentHash
+		vectors[i], _ = m.config.Embedder.Embed(ctx, doc.Content)
+		metadataBytes, _ := json.Marshal(doc.Metadata)
+		metadatas[i] = (metadataBytes)
+		createdAts[i] = doc.CreatedAt.Unix()
+		updatedAts[i] = doc.UpdatedAt.Unix()
+	}
+
+	// 创建列
+	idColumn := entity.NewColumnVarChar("id", ids)
+	titleColumn := entity.NewColumnVarChar("title", titles)
+	contentColumn := entity.NewColumnVarChar("content", contents)
+	hashColumn := entity.NewColumnVarChar("content_hash", hashes)
+	vectorColumn := entity.NewColumnFloatVector("vector", m.config.Dim, vectors)
+	metadataColumn := entity.NewColumnJSONBytes("metadata", metadatas)
+	createdAtColumn := entity.NewColumnInt64("created_at", createdAts)
+	updatedAtColumn := entity.NewColumnInt64("updated_at", updatedAts)
+
+	// 插入数据
+	_, err := m.client.Upsert(ctx, m.config.CollectionName, "",
+		idColumn, titleColumn, contentColumn, hashColumn,
+		vectorColumn, metadataColumn, createdAtColumn, updatedAtColumn)
+	return err
+}
+
+// SearchWithOptions 使用选项搜索
+func (m *MilvusVDB) SearchWithOptions(ctx context.Context, vector []float32, opts *vdb.SearchOptions) ([]*vdb.Document, error) {
+	// 创建搜索参数
+	sp, _ := entity.NewIndexFlatSearchParam()
+
+	// 执行搜索
+	results, err := m.client.Search(
+		ctx,
+		m.config.CollectionName,
+		[]string{},
+		"",
+		[]string{"id", "title", "content", "content_hash", "metadata", "created_at", "updated_at"},
+		// []string{"*"},
+		[]entity.Vector{entity.FloatVector(vector)},
+		"vector",
+		metricsType(m.config.Distance),
+		opts.TopK,
+		sp,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 处理结果
+	var documents []*vdb.Document
+	for _, result := range results {
+		for i, score := range result.Scores {
+			doc := &vdb.Document{
+				Similarity: score,
+			}
+			for _, field := range result.Fields {
+				// 获取字段值
+				if field.Name() == "id" {
+					idColumn := field.(*entity.ColumnVarChar)
+					doc.ID = idColumn.Data()[i]
+				} else if field.Name() == "title" {
+					titleColumn := field.(*entity.ColumnVarChar)
+					doc.Title = titleColumn.Data()[i]
+				} else if field.Name() == "content" {
+					contentColumn := field.(*entity.ColumnVarChar)
+					doc.Content = contentColumn.Data()[i]
+				} else if field.Name() == "content_hash" {
+					hashColumn := field.(*entity.ColumnVarChar)
+					doc.ContentHash = hashColumn.Data()[i]
+				} else if field.Name() == "metadata" {
+					metadataColumn := field.(*entity.ColumnJSONBytes)
+					json.Unmarshal([]byte(metadataColumn.Data()[i]), &doc.Metadata)
+				} else if field.Name() == "created_at" {
+					createdAtColumn := field.(*entity.ColumnInt64)
+					doc.CreatedAt = time.Unix(createdAtColumn.Data()[i], 0)
+				} else if field.Name() == "updated_at" {
+					updatedAtColumn := field.(*entity.ColumnInt64)
+					doc.UpdatedAt = time.Unix(updatedAtColumn.Data()[i], 0)
+				}
+			}
+			documents = append(documents, doc)
+		}
+	}
+	return documents, nil
+}
+
+// Search 搜索向量
+func (m *MilvusVDB) Search(ctx context.Context, vector []float32, opts ...vdb.SearchOption) ([]*vdb.Document, error) {
 	options := &vdb.SearchOptions{
-		TopK:      10,
-		Threshold: 0.5,
+		TopK: 10,
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+	return m.SearchWithOptions(ctx, vector, options)
+}
+
+// SearchQuery 搜索查询
+func (m *MilvusVDB) SearchQuery(ctx context.Context, query string, opts ...vdb.SearchOption) ([]*vdb.Document, error) {
+	options := &vdb.SearchOptions{
+		TopK: 10,
 	}
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	// 准备搜索参数
-	sp, err := entity.NewIndexFlatSearchParam()
+	// 这里需要实现文本到向量的转换逻辑
+	vector, err := m.config.Embedder.Embed(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("create search param: %w", err)
+		return nil, err
 	}
-	sp.AddRadius(options.Threshold)
-	searchResult, err := m.client.Search(
-		ctx,
-		m.collection,
-		[]string{},               // partition names
-		"",                       // expr,Filter expressions
-		[]string{"vector_field"}, // List ofx field names to include in the return.
-		//[]entity.Vector{entity.FloatVector(vector)}, // search vectors
-		[]entity.Vector{}, // search vectors
-		"id",              // vector fields
-		entity.L2,         // metric type
-		options.TopK,      // topK
-		sp,                // search param
-	)
-	if err != nil {
-		return nil, fmt.Errorf("search: %w", err)
-	}
-
-	// 转换结果
-	var docs []vdb.Document
-	for i := 0; i < len(searchResult); i++ {
-		score := searchResult[i].Scores
-		_ = score
-		// if score > options.Threshold {
-		// 	docs = append(docs, vdb.Document{
-		// 		ID:     searchResult[i].ID,
-		// 		Score:  score,
-		// 		Vector: vector,
-		// 	})
-		// }
-	}
-
-	return docs, nil
+	return m.SearchWithOptions(ctx, vector, options)
 }
 
-// SearchQuery ...
-func (m *VDB) SearchQuery(ctx context.Context, query string, opts ...vdb.SearchOption) ([]vdb.Document, error) {
-	// 这里需要先将 query 转换为向量
-	// 假设有一个 textToVector 函数可以完成这个转换
-	vector, err := m.textToVector(query)
+// SearchQueryWithOptions 使用选项搜索查询
+func (m *MilvusVDB) SearchQueryWithOptions(ctx context.Context, query string, opts *vdb.SearchOptions) ([]*vdb.Document, error) {
+	vector, err := m.config.Embedder.Embed(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("convert query to vector: %w", err)
+		return nil, err
 	}
-
-	return m.Search(ctx, vector, opts...)
+	return m.SearchWithOptions(ctx, vector, opts)
 }
 
-// Delete ...
-func (m *VDB) Delete(ctx context.Context, id string) error {
-	expr := fmt.Sprintf("id == %s", id)
-	err := m.client.Delete(
-		ctx,
-		m.collection,
-		"",
-		expr,
-	)
-	if err != nil {
-		return fmt.Errorf("delete: %w", err)
-	}
-	return nil
+// Delete 删除文档
+func (m *MilvusVDB) Delete(ctx context.Context, id string) error {
+	expr := fmt.Sprintf("id == '%s'", id)
+	return m.client.Delete(ctx, m.config.CollectionName, expr, "")
 }
 
-// Close ...
-func (m *VDB) Close() error {
+// Close 关闭客户端连接
+func (m *MilvusVDB) Close() error {
 	return m.client.Close()
 }
 
-// 私有辅助方法
-func (m *VDB) EnsureCollection(ctx context.Context, cfg Config) error {
-	has, err := m.client.HasCollection(ctx, cfg.Collection)
-	if err != nil {
-		return fmt.Errorf("check collection: %w", err)
+func metricsType(distance vdb.Distance) entity.MetricType {
+	metricsType := entity.L2
+	if distance == vdb.DistanceCosine {
+		metricsType = entity.COSINE
+	} else if distance == vdb.DistanceL2 {
+		metricsType = entity.L2
 	}
-	if has {
-		return nil
-	}
-	schema := entity.NewSchema().WithName(cfg.Collection).WithDescription(cfg.Description)
-	for _, f := range cfg.Fields {
-		schema = schema.WithField(entity.NewField().WithName(f.Name).WithDataType(f.Type).WithIsPrimaryKey(f.IsPrimary).WithIsAutoID(f.IsAuto).WithDim(int64(m.dimension)))
-	}
-
-	err = m.client.CreateCollection(ctx, schema, int32(cfg.ShareNum))
-	if err != nil {
-		return fmt.Errorf("create collection: %w", err)
-	}
-	return nil
-}
-
-func (m *VDB) textToVector(text string) ([]float64, error) {
-	// TODO: 实现文本到向量的转换
-	// 这里需要调用外部的嵌入模型服务
-	return nil, fmt.Errorf("not implemented")
+	return metricsType
 }
