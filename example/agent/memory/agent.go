@@ -27,18 +27,28 @@ func init() {
 }
 
 func main() {
-	agentx := agent.NewAgent("test",
+	sessionID := "session_1"
+
+	agentx := agent.NewAgent("",
 		agent.WithMemory(memory.NewFlatMemory(nil)),
 		agent.WithModel(model),
 	)
 
-	response := agentx.Invoke(context.Background(), "My name is John Doe and I like to hike in the mountains on weekends.", agent.WithStream(false))
+	response := agentx.Invoke(context.Background(),
+		"My name is John Doe and I like to hike in the mountains on weekends.",
+		agent.WithStream(false),
+		agent.WithSessionID(sessionID),
+	)
 	if response.Error != nil {
 		panic(response.Error)
 	}
 	fmt.Println(response.Answer)
 
-	response2 := agentx.Invoke(context.Background(), "What are my hobbies?", agent.WithStream(false))
+	response2 := agentx.Invoke(context.Background(),
+		"What are my hobbies?",
+		agent.WithStream(false),
+		agent.WithSessionID(sessionID),
+	)
 	if response2.Error != nil {
 		panic(response2.Error)
 	}

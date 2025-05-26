@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,12 +26,20 @@ func NewFlatMemory(model *llm.Instance) Memory {
 	}
 }
 
+func (m *FlatMemory) Get(ctx context.Context, sessionID string) ([]*MemoryItem, error) {
+	m.RLock()
+	defer m.RUnlock()
+
+	fmt.Println("get memory", m.memoryItems[sessionID])
+	return m.memoryItems[sessionID], nil
+}
+
 func (m *FlatMemory) Add(ctx context.Context, sessionID string, item *MemoryItem) error {
 	m.RLock()
 	history := m.memoryItems[sessionID]
 	m.RUnlock()
 
-	history = append(history, item)
+	// history = append(history)
 
 	// messages
 	prompt += "\t4. Decide to delete an existing memory, using the 'delete_memory' tool."
@@ -54,7 +63,7 @@ func (m *FlatMemory) Add(ctx context.Context, sessionID string, item *MemoryItem
 		WithInputs(map[string]any{
 			"memory_capture_instructions": memoriesToCapture,
 			// "existing_memories":   m.existingMemories,
-		}).InvokeQuery(ctx, "处理 memory")
+		}).InvokeQuery(ctx, item.Content)
 
 	fmt.Println("resp", resp.Completion())
 
@@ -80,15 +89,25 @@ func (m *FlatMemory) memoryTools(sessionID string) []any {
 			},
 		}),
 		tool.WithFunction(func(ctx context.Context, args map[string]any) (string, error) {
+
+			topics := []string{}
+			if _, ok := args["topics"].(string); ok {
+				topics = strings.Split(args["topics"].(string), ",")
+			} else if _, ok := args["topics"].([]any); ok {
+				for _, topic := range args["topics"].([]any) {
+					topics = append(topics, topic.(string))
+				}
+			}
 			m.Lock()
 			defer m.Unlock()
-			fmt.Println("add memory", args)
+
 			m.memoryItems[sessionID] = append(m.memoryItems[sessionID], &MemoryItem{
 				ID:        time.Now().Unix(),
 				SessionID: sessionID,
 				Content:   args["memory"].(string),
-				Topics:    args["topics"].([]string),
+				Topics:    topics,
 			})
+			fmt.Println("set memory", m.memoryItems[sessionID])
 			return "Memory added successfully", nil
 		}),
 	))
