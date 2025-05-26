@@ -2,8 +2,8 @@ server:
   port: 8080
 
 database:
-  host: 9.135.232.87
+  host: localhost
   port: 5432
   user: postgres_admin
-  password: cdgxxx2025@TX
+  password: xxxx
   dbname: bookkeeper 
