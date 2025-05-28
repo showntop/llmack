@@ -2,7 +2,6 @@ package program
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/showntop/llmack/llm"
@@ -194,25 +193,9 @@ func (rp *funcall) buildTools(tools ...any) []*llm.Tool {
 			Function: &llm.FunctionDefinition{
 				Name:        tool.Name,
 				Description: tool.Description,
-				Parameters: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-					"required":   []string{},
-				},
+				Parameters:  tool.Parameters,
 			},
 		}
-
-		for _, p := range tool.Parameters {
-			properties := messageTool.Function.Parameters["properties"].(map[string]any)
-			properties[p.Name] = map[string]any{
-				"description": p.LLMDescrition,
-				"type":        p.Type,
-			}
-			if p.Required {
-				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
-			}
-		}
-
 		messageTools = append(messageTools, messageTool)
 	}
 	return messageTools
@@ -224,12 +207,7 @@ func (rp *funcall) invokeTools(ctx context.Context, toolCalls []*llm.ToolCall) (
 	wg := errgroup.Group{}
 	for _, toolCall := range toolCalls {
 		wg.Go(func() error {
-			var args map[string]any
-			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-				ch <- [2]string{toolCall.ID, "error with " + err.Error()}
-				return err
-			}
-			toolResult, err := tool.Spawn(toolCall.Function.Name).Invoke(ctx, args)
+			toolResult, err := tool.Spawn(toolCall.Function.Name).Invoke(ctx, toolCall.Function.Arguments)
 			if err != nil {
 				ch <- [2]string{toolCall.ID, "error with " + err.Error()}
 				return err

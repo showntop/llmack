@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -88,13 +89,17 @@ func (m *FlatMemory) memoryTools(sessionID string) []any {
 				Required:      true,
 			},
 		}),
-		tool.WithFunction(func(ctx context.Context, args map[string]any) (string, error) {
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			var params map[string]any
+			if err := json.Unmarshal([]byte(args), &params); err != nil {
+				return "", fmt.Errorf("failed to unmarshal arguments in json, %v", err)
+			}
 
 			topics := []string{}
-			if _, ok := args["topics"].(string); ok {
-				topics = strings.Split(args["topics"].(string), ",")
-			} else if _, ok := args["topics"].([]any); ok {
-				for _, topic := range args["topics"].([]any) {
+			if _, ok := params["topics"].(string); ok {
+				topics = strings.Split(params["topics"].(string), ",")
+			} else if _, ok := params["topics"].([]any); ok {
+				for _, topic := range params["topics"].([]any) {
 					topics = append(topics, topic.(string))
 				}
 			}
@@ -104,7 +109,7 @@ func (m *FlatMemory) memoryTools(sessionID string) []any {
 			m.memoryItems[sessionID] = append(m.memoryItems[sessionID], &MemoryItem{
 				ID:        time.Now().Unix(),
 				SessionID: sessionID,
-				Content:   args["memory"].(string),
+				Content:   params["memory"].(string),
 				Topics:    topics,
 			})
 			fmt.Println("set memory", m.memoryItems[sessionID])
@@ -122,14 +127,19 @@ func (m *FlatMemory) memoryTools(sessionID string) []any {
 				Required:      true,
 			},
 		}),
-		tool.WithFunction(func(ctx context.Context, args map[string]any) (string, error) {
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			var params map[string]any
+			if err := json.Unmarshal([]byte(args), &params); err != nil {
+				return "", fmt.Errorf("failed to unmarshal arguments in json, %v", err)
+			}
+
 			m.Lock()
 			defer m.Unlock()
-			fmt.Println("update memory", args)
+
 			m.memoryItems[sessionID] = append(m.memoryItems[sessionID], &MemoryItem{
 				ID:        time.Now().Unix(),
 				SessionID: sessionID,
-				Content:   args["memory"].(string),
+				Content:   params["memory"].(string),
 			})
 			return "Memory updated successfully", nil
 		}),
@@ -145,14 +155,19 @@ func (m *FlatMemory) memoryTools(sessionID string) []any {
 				Required:      true,
 			},
 		}),
-		tool.WithFunction(func(ctx context.Context, args map[string]any) (string, error) {
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			var params map[string]any
+			if err := json.Unmarshal([]byte(args), &params); err != nil {
+				return "", fmt.Errorf("failed to unmarshal arguments in json, %v", err)
+			}
+
 			m.Lock()
 			defer m.Unlock()
-			fmt.Println("delete memory", args)
+
 			m.memoryItems[sessionID] = append(m.memoryItems[sessionID], &MemoryItem{
 				ID:        time.Now().Unix(),
 				SessionID: sessionID,
-				Content:   args["memory"].(string),
+				Content:   params["memory"].(string),
 			})
 			return "Memory deleted successfully", nil
 		}),

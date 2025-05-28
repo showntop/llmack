@@ -52,9 +52,9 @@ func WithKnowledge(retrieval *rag.Indexer) Option {
 func WithInstructions(instructions ...string) Option {
 	return func(a any) {
 		if aa, ok := a.(*Agent); ok {
-			aa.Instructions = instructions
+			aa.Instructions = append(aa.Instructions, instructions...)
 		} else if at, ok := a.(*Team); ok {
-			at.Instructions = instructions
+			at.Instructions = append(at.Instructions, instructions...)
 		}
 	}
 }

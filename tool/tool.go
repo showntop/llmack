@@ -4,20 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/flosch/pongo2/v6"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/showntop/llmack/log"
 )
 
+type InvokeFunc func(context.Context, string) (string, error)
+
 type Tool struct {
-	ID          int64  // 引用的工具ID
-	Kind        string // 引用的工具类型
-	Name        string
-	Description string
-	Parameters  []Parameter `json:"parameters,omitempty"` // 参数，可选
+	ID           int64  // 引用的工具ID
+	Kind         string // 引用的工具类型
+	Name         string
+	Description  string
+	*ParamsOneOf `json:"parameters,omitempty"` // 参数，可选
 
 	AuthenticationType  string
 	AuthenticationValue string
@@ -25,7 +29,19 @@ type Tool struct {
 	Method              string `json:"method"`     // 方法
 	Body                string `json:"body"`       // body
 
-	Invokex func(context.Context, map[string]any) (string, error)
+	invoke InvokeFunc
+}
+
+func (t *Tool) WithParameters(parameters ...Parameter) *Tool {
+	t.ParamsOneOf = &ParamsOneOf{
+		params1: parameters,
+	}
+	return t
+}
+
+func (t *Tool) WithInvokeFunc(invoke InvokeFunc) *Tool {
+	t.invoke = invoke
+	return t
 }
 
 type Option func(*Tool)
@@ -58,26 +74,39 @@ func WithDescription(description string) Option {
 	}
 }
 
-func WithParameters(parameters []Parameter) Option {
+func WithParameters(parameters ...any) Option {
 	return func(t *Tool) {
-		t.Parameters = parameters
+		if len(parameters) == 0 {
+			return
+		}
+		for _, parameter := range parameters {
+			if x, ok := parameter.(Parameter); ok {
+				t.ParamsOneOf.params1 = append(t.ParamsOneOf.params1, x)
+			} else if x, ok := parameter.(*openapi3.Schema); ok {
+				t.ParamsOneOf.params2 = x
+			}
+		}
 	}
 }
 
-func WithFunction(function func(ctx context.Context, args map[string]any) (string, error)) Option {
+func WithFunction(function func(ctx context.Context, args string) (string, error)) Option {
 	return func(t *Tool) {
-		t.Invokex = function
+		t.invoke = function
 	}
 }
 
-func (t *Tool) Invoke(ctx context.Context, params map[string]any) (string, error) {
+func (t *Tool) Invoke(ctx context.Context, params string) (string, error) {
 	if t.Kind == "api" {
 		return t.invokeAPI(ctx, params)
 	}
-	return t.Invokex(ctx, params)
+	return t.invoke(ctx, params)
 }
 
-func (t *Tool) invokeAPI(ctx context.Context, params map[string]any) (string, error) {
+func (t *Tool) invokeAPI(ctx context.Context, args string) (string, error) {
+	var params map[string]any
+	if err := json.Unmarshal([]byte(args), &params); err != nil {
+		return "", fmt.Errorf("failed to unmarshal arguments in json, %v", err)
+	}
 	// Extract the URL and request parameters
 	url := t.ServerURL
 	method := t.Method

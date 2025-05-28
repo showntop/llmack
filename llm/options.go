@@ -114,7 +114,7 @@ type FunctionDefinition struct {
 	// Description is a description of the function.
 	Description string `json:"description"`
 	// Parameters is a list of parameters for the function.
-	Parameters map[string]any `json:"parameters,omitempty"`
+	Parameters any `json:"parameters,omitempty"`
 }
 
 // ToolChoice is a specific tool to use.

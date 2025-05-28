@@ -21,8 +21,8 @@ type react struct {
 
 type ReactResult struct {
 	Tool *struct {
-		Name string         `json:"name"`
-		Args map[string]any `json:"args"`
+		Name string `json:"name"`
+		Args string `json:"args"`
 	}
 	Thoughts *struct {
 		SelfReason string `json:"self_reason"`
@@ -220,24 +220,8 @@ func (rp *react) renderTools(tools ...string) []*llm.Tool {
 			Function: &llm.FunctionDefinition{
 				Name:        tool.Name,
 				Description: tool.Description,
-				Parameters: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-					"required":   []string{},
-				},
+				Parameters:  tool.Parameters(),
 			},
-		}
-
-		for _, p := range tool.Parameters {
-			properties := messageTool.Function.Parameters["properties"].(map[string]any)
-			properties[p.Name] = map[string]any{
-				"description": p.LLMDescrition,
-				"type":        p.Type,
-				"enum":        nil,
-			}
-			if p.Required {
-				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
-			}
 		}
 
 		messageTools = append(messageTools, messageTool)
