@@ -30,7 +30,7 @@ func runWithCache() {
 
 	instance := llm.NewInstance(openaic.Name,
 		llm.WithCache(llm.NewMemoCache()),
-		llm.WithLogger(&log.WrapLogger{}),
+		llm.SetLogger(&log.WrapLogger{}),
 	)
 
 	resp, err := instance.Invoke(ctx,

@@ -193,7 +193,7 @@ func (rp *funcall) buildTools(tools ...any) []*llm.Tool {
 			Function: &llm.FunctionDefinition{
 				Name:        tool.Name,
 				Description: tool.Description,
-				Parameters:  tool.Parameters,
+				Parameters:  tool.Parameters(),
 			},
 		}
 		messageTools = append(messageTools, messageTool)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -48,10 +49,9 @@ func (o *OAILLM) Invoke(ctx context.Context, messages []Message, options *Invoke
 
 // ChatCompletions ...
 func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest) (io.ReadCloser, error) {
-
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal oaillmchat completions request error %s", err)
 	}
 	payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
 	payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)

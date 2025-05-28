@@ -27,16 +27,18 @@ type BrowserAgent struct {
 	Browser        *browser.Browser
 }
 
+// NewBrowserAgent ...
 func NewBrowserAgent(name string, options ...Option) *BrowserAgent {
 	browserInstance := browser.NewBrowser(browser.NewBrowserConfig())
 	return &BrowserAgent{
 		Agent:          *NewAgent(name, options...),
 		Browser:        browserInstance,
+		controller:     controller.NewController(),
 		BrowserContext: browserInstance.NewContext(),
 	}
 }
 
-// concurrent invoke not support
+// Invoke concurrent invoke not support
 func (agent *BrowserAgent) Invoke(ctx context.Context, task string, opts ...InvokeOption) *AgentRunResponse {
 	options := &InvokeOptions{
 		Retries: 1,
@@ -48,6 +50,7 @@ func (agent *BrowserAgent) Invoke(ctx context.Context, task string, opts ...Invo
 	agent.response = &AgentRunResponse{
 		Stream: make(chan *llm.Chunk, 10),
 	}
+
 	if options.Stream {
 		go func() {
 			defer func() {
@@ -56,10 +59,9 @@ func (agent *BrowserAgent) Invoke(ctx context.Context, task string, opts ...Invo
 			agent.invoke(ctx, task, options)
 		}()
 		return agent.response
-	} else {
-		agent.invoke(ctx, task, options)
-		return agent.response
 	}
+	agent.invoke(ctx, task, options)
+	return agent.response
 }
 
 func (agent *BrowserAgent) invoke(ctx context.Context, task string, options *InvokeOptions) (*AgentRunResponse, error) {
@@ -73,6 +75,7 @@ func (agent *BrowserAgent) invoke(ctx context.Context, task string, options *Inv
 	agent.SessionID = session.ID
 
 	defer func() { //  Update Agent Memory
+
 		log.DebugContextf(ctx, "agent response:\n")
 		log.DebugContextf(ctx, "===============================\n %s", agent.response.Answer)
 		log.DebugContextf(ctx, "===============================")
@@ -132,7 +135,7 @@ func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) 
 		}
 	}
 	agent.response.Answer = predictor.Response().Completion()
-	return nil, nil
+	return agent.response, nil
 }
 
 func (agent *BrowserAgent) execActionTool(ctx context.Context, actionModel *controller.ActionModel) string {

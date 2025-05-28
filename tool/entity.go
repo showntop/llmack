@@ -36,6 +36,9 @@ type ParamsOneOf struct {
 }
 
 func (p *ParamsOneOf) Parameters() any {
+	if p == nil {
+		return nil
+	}
 	if len(p.params1) > 0 {
 		properties := map[string]any{}
 		required := []string{}
