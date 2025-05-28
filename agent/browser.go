@@ -28,8 +28,11 @@ type BrowserAgent struct {
 }
 
 func NewBrowserAgent(name string, options ...Option) *BrowserAgent {
+	browserInstance := browser.NewBrowser(browser.NewBrowserConfig())
 	return &BrowserAgent{
-		Agent: *NewAgent(name, options...),
+		Agent:          *NewAgent(name, options...),
+		Browser:        browserInstance,
+		BrowserContext: browserInstance.NewContext(),
 	}
 }
 
@@ -106,6 +109,29 @@ func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) 
 		return nil, errors.New("no action model")
 	}
 	//
+	var tools []any
+	for _, tool := range agent.Tools {
+		tools = append(tools, tool)
+	}
+	tools = append(tools, agent.execActionTool(ctx, actionModel))
+
+	predictor := program.FunCall(
+		program.WithLLMInstance(agent.llm),
+	).WithInstruction(agentPrompt).
+		// WithInputs(input).
+		WithTools(tools...).
+		WithStream(stream).
+		InvokeQuery(ctx, task)
+	if predictor.Error() != nil {
+		agent.response.Error = predictor.Error()
+		return agent.response, predictor.Error()
+	}
+	if stream {
+		for chunk := range predictor.Stream() {
+			agent.response.Stream <- chunk
+		}
+	}
+	agent.response.Answer = predictor.Response().Completion()
 	return nil, nil
 }
 
