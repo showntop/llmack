@@ -48,7 +48,8 @@ type Option func(*Tool)
 
 func New(opts ...Option) *Tool {
 	t := &Tool{
-		Kind: "code",
+		Kind:        "code",
+		ParamsOneOf: &ParamsOneOf{},
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -78,6 +79,9 @@ func WithParameters(parameters ...any) Option {
 	return func(t *Tool) {
 		if len(parameters) == 0 {
 			return
+		}
+		if t.ParamsOneOf == nil {
+			t.ParamsOneOf = &ParamsOneOf{}
 		}
 		for _, parameter := range parameters {
 			if x, ok := parameter.(Parameter); ok {

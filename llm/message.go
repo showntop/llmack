@@ -104,6 +104,9 @@ func NewUserMultipartMessage(contents ...*MultipartContent) PromptMessage {
 
 // NewAssistantMessage ...
 func NewAssistantMessage(text string) *AssistantMessage {
+	if text == "" {
+		text = "continue"
+	}
 	m := &AssistantMessage{PromptMessage: PromptMessage{}}
 	m.content = text
 	m.role = MessageRoleAssistant

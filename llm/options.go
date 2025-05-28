@@ -207,3 +207,9 @@ func WithStream(stream bool) InvokeOption {
 		o.Stream = stream
 	}
 }
+
+func WithToolChoice(toolChoice any) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.ToolChoice = toolChoice
+	}
+}

@@ -53,25 +53,25 @@ func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest
 	if err != nil {
 		return nil, fmt.Errorf("marshal oaillmchat completions request error %s", err)
 	}
-	payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
-	payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
+	// payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
+	// payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
 	// payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
 
 	log.InfoContextf(ctx, "OAILLM ChatCompletions request payload %s", string(payload)) // for debug
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", o.baseURL, bytes.NewReader(payload))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oaillm chat completions new request error %s", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
 	resp, err := o.client.Do(httpReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oaillm chat completions request error %s", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
-		return nil, errors.New(resp.Status + ": " + string(raw))
+		return nil, errors.New("oaillm chat completions request statuserror " + resp.Status + ": " + string(raw))
 	}
 
 	return resp.Body, nil
@@ -95,7 +95,9 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 	if len(options.Tools) <= 0 {
 		return request
 	}
-	request.ToolChoice = "auto"
+	if request.ToolChoice == nil {
+		request.ToolChoice = "auto"
+	}
 	request.Tools = options.Tools
 	return request
 }

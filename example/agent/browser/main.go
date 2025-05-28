@@ -15,11 +15,11 @@ import (
 func init() {
 	godotenv.Load()
 
+	log.SetLogger(&log.WrapLogger{})
+
 	llm.WithSingleConfig(map[string]any{
 		"api_key": os.Getenv("qwen_api_key"),
 	})
-
-	llm.SetLogger(&log.WrapLogger{})
 
 }
 
@@ -29,7 +29,7 @@ func main() {
 		agent.WithModel(llm.NewInstance(qwen.Name, llm.WithDefaultModel("qwen-vl-max-latest"))),
 	)
 
-	response := browserAgent.Invoke(context.Background(), "what is the weather in tokyo")
+	response := browserAgent.Invoke(context.Background(), "Find todays DOW stock price")
 	if response.Error != nil {
 		panic(response.Error)
 	}

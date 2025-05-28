@@ -4,16 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/google/uuid"
+	"github.com/playwright-community/playwright-go"
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/memory"
 	"github.com/showntop/llmack/pkg/browser"
 	"github.com/showntop/llmack/program"
-	"github.com/showntop/llmack/rag"
 	"github.com/showntop/llmack/storage"
 	"github.com/showntop/llmack/tool"
 	"github.com/showntop/llmack/tool/browser/controller"
@@ -118,13 +121,29 @@ func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) 
 	}
 	tools = append(tools, agent.execActionTool(ctx, actionModel))
 
+	prompt := ""
+	if agent.Name != "" {
+		prompt = strings.Replace(prompt, "{name}", agent.Name, 1)
+	}
+	if agent.Role != "" {
+		prompt = strings.Replace(prompt, "{role}", agent.Role, 1)
+	}
+	prompt += "You are designed to use browser to automate tasks.\n"
+	prompt += "Your goal is to accomplish the ultimate task following the rules.\n"
+	prompt += browserAgentPrompt
 	predictor := program.FunCall(
 		program.WithLLMInstance(agent.llm),
-	).WithInstruction(agentPrompt).
+	).WithInstruction(prompt).
 		// WithInputs(input).
 		WithTools(tools...).
 		WithStream(stream).
-		InvokeQuery(ctx, task)
+		WithToolChoice(map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name": "AgentOutput",
+			},
+		}).
+		InvokeWithMessages(ctx, agent.getInitialMessages(ctx, task))
 	if predictor.Error() != nil {
 		agent.response.Error = predictor.Error()
 		return agent.response, predictor.Error()
@@ -138,100 +157,229 @@ func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) 
 	return agent.response, nil
 }
 
-func (agent *BrowserAgent) execActionTool(ctx context.Context, actionModel *controller.ActionModel) string {
-	fun := func(ctx context.Context, args string) (string, error) {
-		return "agent.response.Answer", nil
+func (agent *BrowserAgent) getInitialMessages(_ context.Context, task string) []llm.Message {
+
+	messages := []llm.Message{llm.NewUserTextMessage(strings.Replace(userTaskPrompt, "{{task}}", task, 1))}
+
+	messages = append(messages, llm.NewAssistantMessage(""))
+	messages = append(messages, llm.NewUserTextMessage("Example output: "))
+	args := AgentOutput{
+		CurrentState: &AgentBrain{
+			EvaluationPreviousGoal: `Success - I successfully clicked on the 'Apple' link from the Google Search results page, 
+				which directed me to the 'Apple' company homepage. This is a good start toward finding 
+				the best place to buy a new iPhone as the Apple website often list iPhones for sale.`,
+			Memory: `I searched for 'iPhone retailers' on Google. From the Google Search results page, 
+				I used the 'click_element_by_index' tool to click on a element labelled 'Best Buy' but calling 
+				the tool did not direct me to a new page. I then used the 'click_element_by_index' tool to click 
+				on a element labelled 'Apple' which redirected me to the 'Apple' company homepage. 
+				Currently at step 3/15.`,
+			NextGoal: `Looking at reported structure of the current page, I can see the item '[127]<h3 iPhone/>' 
+				in the content. I think this button will lead to more information and potentially prices 
+				for iPhones. I'll click on the link to 'iPhone' at index [127] using the 'click_element_by_index' 
+				tool and hope to see prices on the next page.`,
+		},
+		Actions: []*controller.ActModel{
+			{
+				"click_element_by_index": map[string]interface{}{
+					"index": 127,
+				},
+			},
+		},
 	}
+	argsBytes, err := json.Marshal(args)
+	if err != nil {
+		panic(err)
+	}
+	exampleToolCallMessage := llm.NewAssistantMessage("").WithToolCalls([]*llm.ToolCall{
+		{
+			ID:       "0001",
+			Type:     "tool_call",
+			Function: llm.ToolCallFunction{Name: "AgentOutput", Arguments: string(argsBytes)},
+		},
+	})
+	messages = append(messages, exampleToolCallMessage)
+
+	messages = append(messages, llm.NewToolMessage("Browser started", "0001"))
+
+	messages = append(messages, llm.NewUserTextMessage("[Your task history memory starts here]"))
+	return messages
+}
+
+// Current state of the agent
+type AgentBrain struct {
+	EvaluationPreviousGoal string `json:"evaluation_previous_goal"`
+	Memory                 string `json:"memory"`
+	NextGoal               string `json:"next_goal"`
+}
+
+// @dev note: this model is extended with custom actions in AgentService.
+// You can also use some fields that are not in this model as provided by the linter, as long as they are registered in the DynamicActions model.
+type AgentOutput struct {
+	CurrentState *AgentBrain            `json:"current_state"`
+	Actions      []*controller.ActModel `json:"actions" jsonschema:"minItems=1"` // List of actions to execute
+}
+
+func (agent *BrowserAgent) execActionTool(_ context.Context, customActions *controller.ActionModel) string {
+	checkForNewElements := true
+	fun := func(ctx context.Context, args string) (string, error) {
+		results := []*controller.ActionResult{}
+
+		var params AgentOutput
+		if err := json.Unmarshal([]byte(args), &params); err != nil {
+			return "", err
+		}
+
+		cachedSelectorMap := agent.BrowserContext.GetSelectorMap()
+		cachedPathHashes := mapset.NewSet[string]()
+		if cachedSelectorMap != nil {
+			for _, e := range *cachedSelectorMap {
+				cachedPathHashes.Add(e.Hash().BranchPathHash)
+			}
+		}
+
+		agent.BrowserContext.RemoveHighlights()
+
+		for i, action := range params.Actions {
+			if action.GetIndex() != nil && i != 0 {
+				newState := agent.BrowserContext.GetState(false)
+				newSelectorMap := newState.SelectorMap
+
+				// Detect index change after previous action
+				index := action.GetIndex()
+				if index != nil {
+					origTarget := (*cachedSelectorMap)[*index]
+					var origTargetHash *string = nil
+					if origTarget != nil {
+						origTargetHash = playwright.String(origTarget.Hash().BranchPathHash)
+					}
+					newTarget := (*newSelectorMap)[*index]
+					var newTargetHash *string = nil
+					if newTarget != nil {
+						newTargetHash = playwright.String(newTarget.Hash().BranchPathHash)
+					}
+
+					if origTargetHash == nil || newTargetHash == nil || *origTargetHash != *newTargetHash {
+						msg := fmt.Sprintf("Element index changed after action %d / %d, because page changed.", i, len(params.Actions))
+						log.Info(msg)
+						results = append(results, &controller.ActionResult{ExtractedContent: &msg, IncludeInMemory: true})
+						break
+					}
+
+					newPathHashes := mapset.NewSet[string]()
+					if newSelectorMap != nil {
+						for _, e := range *newSelectorMap {
+							newPathHashes.Add(e.Hash().BranchPathHash)
+						}
+					}
+
+					if checkForNewElements && !newPathHashes.IsSubset(cachedPathHashes) {
+						msg := fmt.Sprintf("Something new appeared after action %d / %d", i, len(params.Actions))
+						log.Info(msg)
+						results = append(results, &controller.ActionResult{ExtractedContent: &msg, IncludeInMemory: true})
+						break
+					}
+				}
+			}
+			model := agent.llm
+			result, err := agent.controller.ExecuteAction(action, agent.BrowserContext, model, nil, nil)
+			if err != nil {
+				// TODO(LOW): implement signal handler error
+				// log.Infof("Action %d was cancelled due to Ctrl+C", i+1)
+				// if len(results) > 0 {
+				// 	results = append(results, &controller.ActionResult{Error: playwright.String("The action was cancelled due to Ctrl+C"), IncludeInMemory: true})
+				// }
+				// return nil, errors.New("Action cancelled by user")
+				return "", err
+			}
+			results = append(results, result)
+			lastIndex := len(results) - 1
+			if (results[lastIndex].IsDone != nil && *results[lastIndex].IsDone) || results[lastIndex].Error != nil || i == len(params.Actions)-1 {
+				break
+			}
+
+			time.Sleep(500 * time.Millisecond) // ag.BrowserContext.Config.WaitBetweenActions
+		}
+		resultsJSON, err := json.Marshal(results)
+		if err != nil {
+			return "", err
+		}
+		return string(resultsJSON), nil
+	}
+	actionSchemas := map[string]*openapi3.SchemaRef{}
+	for _, action := range customActions.Actions {
+		// if action.Tool == nil {
+		// 	panic(fmt.Sprintf("action tool is nil: %+v", action))
+		// }
+		actionSchema, ok := action.Tool.Parameters().(*openapi3.Schema)
+		if !ok {
+			panic(fmt.Sprintf("action tool parameters is not a openapi3.Schema: %+v", action.Tool))
+		}
+		actionSchema.Title = action.Tool.Name
+		actionSchema.Description = action.Tool.Description
+		actionSchemas[action.Tool.Name] = &openapi3.SchemaRef{
+			Value: actionSchema,
+		}
+	}
+	// agentBrain, err := einoUtils.GoStruct2ParamsOneOf[AgentBrain]()
+	// if err != nil {
+	// 	return "", err
+	// }
+	// EvaluationPreviousGoal string `json:"evaluation_previous_goal"`
+	// Memory                 string `json:"memory"`
+	// NextGoal               string `json:"next_goal"`
+	agentBrainSchema := &openapi3.Schema{
+		Type: openapi3.TypeObject,
+		Properties: map[string]*openapi3.SchemaRef{
+			"evaluation_previous_goal": {
+				Value: &openapi3.Schema{
+					Type: openapi3.TypeString,
+				},
+			},
+			"memory": {
+				Value: &openapi3.Schema{
+					Type: openapi3.TypeString,
+				},
+			},
+			"next_goal": {
+				Value: &openapi3.Schema{
+					Type: openapi3.TypeString,
+				},
+			},
+		},
+	}
+	agentBrainSchema.Description = "Current state of the agent"
+
 	tl := tool.New(
 		tool.WithName("AgentOutput"),
 		tool.WithDescription("AgentOutput model with custom actions."),
-		tool.WithParameters(nil),
+		tool.WithParameters(
+			&openapi3.Schema{
+				Type: openapi3.TypeObject,
+				Properties: map[string]*openapi3.SchemaRef{
+					"actions": {
+						Value: &openapi3.Schema{
+							Description: "List of actions to execute",
+							Type:        openapi3.TypeArray,
+							Items: &openapi3.SchemaRef{
+								Value: &openapi3.Schema{
+									Properties: actionSchemas,
+								},
+							},
+						},
+					},
+					"current_state": {
+						Value: agentBrainSchema,
+					},
+				},
+				Required: []string{"actions", "current_state"},
+			},
+		),
 		tool.WithFunction(fun),
 	)
 
 	tool.Register(tl)
 
 	return tl.Name
-}
-
-func (agent *BrowserAgent) retry2(ctx context.Context, task string, stream bool) (*AgentRunResponse, error) {
-	input := map[string]any{}
-	agentPrompt := ""
-	if agent.Name != "" {
-		agentPrompt += "\n<name>\n" + agent.Name + "\n</name>\n"
-	}
-	if agent.Role != "" {
-		agentPrompt += "\n<role>\n" + agent.Role + "\n</role>\n"
-	}
-	if agent.Description != "" {
-		agentPrompt += "\n<description>\n" + agent.Description + "\n</description>\n"
-	}
-	if len(agent.Instructions) > 0 {
-		agentPrompt += "\n<instructions>\n" + strings.Join(agent.Instructions, "\n") + "\n</instructions>\n"
-	}
-	if len(agent.Goals) > 0 {
-		agentPrompt += "\n<goals>\n" + strings.Join(agent.Goals, "\n") + "\n</goals>\n"
-	}
-	if len(agent.Outputs) > 0 {
-		agentPrompt += "\n<outputs>\n" + strings.Join(agent.Outputs, "\n") + "\n</outputs>\n"
-	}
-
-	if agent.memory != nil {
-		items, err := agent.memory.Get(ctx, agent.SessionID)
-		if err != nil {
-			agent.response.Error = err
-			return agent.response, err
-		}
-		if len(items) > 0 {
-			agentPrompt += "You have access to memories from previous interactions with the user that you can use:\n\n"
-			agentPrompt += "<memories_from_previous_interactions>"
-			for _, item := range items {
-				agentPrompt += "\n- " + item.Content
-			}
-			agentPrompt += "\n</memories_from_previous_interactions>\n\n"
-			agentPrompt += "Note: this information is from previous interactions and may be updated in this conversation. "
-			agentPrompt += "You should always prefer information from this conversation over the past memories.\n"
-		} else {
-			agentPrompt += "You have the capability to retain memories from previous interactions with the user, "
-			agentPrompt += "but have not had any interactions with the user yet.\n"
-		}
-	}
-
-	if agent.ragrtv != nil {
-		knowledges, err := agent.ragrtv.Retrieve(ctx, task, rag.WithTopK(10))
-		if err != nil {
-			agent.response.Error = err
-			return agent.response, err
-		}
-		if len(knowledges) > 0 {
-			jsonKnowledges, err := json.Marshal(knowledges)
-			if err != nil {
-				agent.response.Error = err
-				return agent.response, err
-			}
-			task += "\n\nReference the following knowledges from the knowledge base if it helps:\n"
-			task += "<knowledges>\n" + string(jsonKnowledges) + "\n</knowledges>\n"
-		}
-	}
-
-	predictor := program.FunCall(
-		program.WithLLMInstance(agent.llm),
-	).WithInstruction(agentPrompt).
-		WithInputs(input).
-		WithTools(agent.Tools...).
-		WithStream(stream).
-		InvokeQuery(ctx, task)
-	if predictor.Error() != nil {
-		agent.response.Error = predictor.Error()
-		return agent.response, predictor.Error()
-	}
-	if stream {
-		for chunk := range predictor.Stream() {
-			agent.response.Stream <- chunk
-		}
-	}
-	agent.response.Answer = predictor.Response().Completion()
-	return agent.response, nil
 }
 
 func (agent *BrowserAgent) fetchOrCreateSession(ctx context.Context, sessionID string) (*storage.Session, error) {
@@ -276,16 +424,90 @@ func (agent *BrowserAgent) fetchOrCreateSession(ctx context.Context, sessionID s
 
 var (
 	browserAgentPrompt = `
-{{role}}
+# Input Format
 
-{{description}}
+Task
+Previous steps
+Current URL
+Open Tabs
+Interactive Elements
+[index]<type>text</type>
 
-{{goals}}
+- index: Numeric identifier for interaction
+- type: HTML element type (button, input, etc.)
+- text: Element description
+  Example:
+  [33]<div>User form</div>
+  \t*[35]*<button aria-label='Submit form'>Submit</button>
 
-{{instructions}}
+- Only elements with numeric indexes in [] are interactive
+- (stacked) indentation (with \t) is important and means that the element is a (html) child of the element above (with a lower index)
+- Elements with \* are new elements that were added after the previous step (if url has not changed)
 
-{{outputs}}
+# Response Rules
 
-{{tools}}
+1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:
+   {"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not",
+   "memory": "Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz",
+   "next_goal": "What needs to be done with the next immediate action"},
+   "actions":[{"one_action_name": {// action-specific parameter}}, // ... more actions in sequence]}
+
+2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.
+Common action sequences:
+
+- Form filling: [{"input_text": {"index": 1, "text": "username"}}, {"input_text": {"index": 2, "text": "password"}}, {"click_element_by_index": {"index": 3}}]
+- Navigation and extraction: [{"go_to_url": {"url": "https://example.com"}}, {"extract_content": {"goal": "extract the names"}}]
+- Actions are executed in the given order
+- If the page changes after an action, the sequence is interrupted and you get the new state.
+- Only provide the action sequence until an action which changes the page state significantly.
+- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
+- only use multiple actions if it makes sense.
+
+3. ELEMENT INTERACTION:
+
+- Only use indexes of the interactive elements
+
+4. NAVIGATION & ERROR HANDLING:
+
+- If no suitable elements exist, use other functions to complete the task
+- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- Handle popups/cookies by accepting or closing them
+- Use scroll to find elements you are looking for
+- If you want to research something, open a new tab instead of using the current tab
+- If captcha pops up, try to solve it - else try a different approach
+- If the page is not fully loaded, use wait action
+
+5. TASK COMPLETION:
+
+- Use the done action as the last action as soon as the ultimate task is complete
+- Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps.
+- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completely finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
+- Don't hallucinate actions
+- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task.
+
+6. VISUAL CONTEXT:
+
+- When an image is provided, use it to understand the page layout
+- Bounding boxes with labels on their top right corner correspond to element indexes
+
+7. Form filling:
+
+- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.
+
+8. Long tasks:
+
+- Keep track of the status and subresults in the memory.
+- You are provided with procedural memory summaries that condense previous task history (every N steps). Use these summaries to maintain context about completed actions, current progress, and next steps. The summaries appear in chronological order and contain key information about navigation history, findings, errors encountered, and current state. Refer to these summaries to avoid repeating actions and to ensure consistent progress toward the task goal.
+
+9. Extraction:
+
+- If your task is to find information - call extract_content on the specific pages to get and store the information.
+  Your responses must be always JSON with the specified format.
 	`
 )
+
+var userTaskPrompt = `
+Your ultimate task is: "{{task}}",If you achieved your ultimate task, stop everything and use the done action in the next step to complete the task. If not, continue as usual.
+
+`

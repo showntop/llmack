@@ -100,13 +100,13 @@ func (rp *react) WithInstruction(i string) *react {
 }
 
 // Invoke invoke forward for predicte
-func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Response {
+func (rp *react) Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *Response {
 	var value Response = Response{p: rp.predictor, stream: make(chan *llm.Chunk, 10000)}
 	value.p = rp.predictor
 
 	thoughts := []map[string]any{}
 	for i := 0; i < 50; i++ {
-		result, err := rp.invoke(ctx, inputs, thoughts)
+		result, err := rp.invoke(ctx, messages, query, inputs, thoughts)
 		if err != nil {
 			continue
 		}
@@ -137,7 +137,6 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Response {
 		}
 	}
 
-	messages := []llm.Message{}
 	iii, _ := prompt.Render(rp.userInstruction, inputs)
 	messages = append(messages, llm.NewUserTextMessage(iii))
 	messages = append(messages, llm.NewAssistantMessage(rp.renderThoughts(thoughts)))
@@ -159,7 +158,7 @@ func (rp *react) Invoke(ctx context.Context, inputs map[string]any) *Response {
 	return &value
 }
 
-func (rp *react) invoke(ctx context.Context, inputs map[string]any, thoughts []map[string]any) (*ReactResult, error) {
+func (rp *react) invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any, thoughts []map[string]any) (*ReactResult, error) {
 	var result ReactResult
 	messages, err := rp.adapter.Format(rp.predictor, inputs, nil)
 	if err != nil {

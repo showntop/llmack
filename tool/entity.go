@@ -1,6 +1,8 @@
 package tool
 
-import "github.com/getkin/kin-openapi/openapi3"
+import (
+	"github.com/getkin/kin-openapi/openapi3"
+)
 
 // ParameterType 枚举类型
 type ParameterType string

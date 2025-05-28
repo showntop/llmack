@@ -9,22 +9,23 @@ import (
 
 // predictor ...
 type predictor struct {
-	Mode      string
-	stream    bool
-	model     *llm.Instance
-	adapter   Adapter
-	inputs    map[string]any
-	observers []llm.Message
-	tools     []any
+	Mode       string
+	stream     bool
+	toolChoice any
+	model      *llm.Instance
+	adapter    Adapter
+	inputs     map[string]any
+	observers  []llm.Message
+	tools      []any
 	Promptx
 
 	invoker Invoker
 	reponse *Response
 }
 
+// Invoker 定义了 predictor 的调用方式
 type Invoker interface {
-	Invokex(ctx context.Context, query string) *predictor
-	Invoke(ctx context.Context, inputs map[string]any) *predictor
+	Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *predictor
 }
 
 func NewPredictor(opts ...option) *predictor {
@@ -121,50 +122,41 @@ func (p *predictor) WithStream(stream bool) *predictor {
 	return p
 }
 
+func (p *predictor) WithToolChoice(toolChoice any) *predictor {
+	p.toolChoice = toolChoice
+	return p
+}
+
 // InvokeQuery invoke forward for predicte
 func (p *predictor) InvokeQuery(ctx context.Context, query string) *predictor {
 	p.reponse = NewResponse()
 	if p.stream {
-		go p.invoker.Invokex(ctx, query)
+		go p.invoker.Invoke(ctx, nil, query, p.inputs)
 		return p
 	}
-	return p.invoker.Invokex(ctx, query)
+	return p.invoker.Invoke(ctx, nil, query, p.inputs)
 }
 
-func (p *predictor) Invokex(ctx context.Context, query string) *predictor {
-	messages, err := p.adapter.Format(p, p.inputs, p.reponse)
-	if err != nil {
-		p.reponse.err = err
+// InvokeWithMessages invoke forward for predicte with messages
+func (p *predictor) InvokeWithMessages(ctx context.Context, messages []llm.Message) *predictor {
+	p.reponse = NewResponse()
+	if p.stream {
+		go p.invoker.Invoke(ctx, messages, "", p.inputs)
 		return p
 	}
-
-	response, err := p.model.Invoke(ctx, messages,
-		llm.WithStream(true),
-	)
-	if err != nil {
-		p.reponse.err = err
-		return p
-	}
-
-	stream := response.Stream()
-
-	// 合并 message
-	answerContent := ""
-	for chunk := range stream.Next() {
-		p.reponse.stream <- chunk
-		answerContent += chunk.Choices[0].Delta.Content()
-	}
-
-	p.reponse.message = llm.NewAssistantMessage(answerContent)
-	return p
+	return p.invoker.Invoke(ctx, messages, "", p.inputs)
 }
 
 // Invoke invoke forward for predicte
-func (p *predictor) Invoke(ctx context.Context, inputs map[string]any) *predictor {
-	messages, err := p.adapter.Format(p, inputs, p.reponse)
+func (p *predictor) Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *predictor {
+	systemMessages, err := p.adapter.Format(p, inputs, p.reponse)
 	if err != nil {
 		p.reponse.err = err
 		return p
+	}
+	messages = append(systemMessages, messages...)
+	if len(query) > 0 {
+		messages = append(messages, llm.NewUserTextMessage(query))
 	}
 	response, err := p.model.Invoke(ctx, messages,
 		llm.WithStream(true),
@@ -178,6 +170,7 @@ func (p *predictor) Invoke(ctx context.Context, inputs map[string]any) *predicto
 	return p
 }
 
-func (r *predictor) FetchHistoryMessages(ctx context.Context) []llm.Message {
+// FetchHistoryMessages fetch history messages
+func (p *predictor) FetchHistoryMessages(ctx context.Context) []llm.Message {
 	return nil
 }
