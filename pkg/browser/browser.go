@@ -52,7 +52,7 @@ func NewBrowser(customConfig BrowserConfig) *Browser {
 	}
 }
 
-func (b *Browser) NewContext() *Session {
+func (b *Browser) NewSession() *Session {
 	return &Session{
 		ContextID: uuid.New().String(),
 		Config:    b.Config,

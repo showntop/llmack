@@ -14,7 +14,7 @@ func TestNewBrowser(t *testing.T) {
 		"headless": true,
 	})
 	defer browser.Close()
-	bc := browser.NewContext()
+	bc := browser.NewSession()
 	defer bc.Close()
 
 	page := bc.GetCurrentPage()
@@ -29,7 +29,7 @@ func TestScreenshot(t *testing.T) {
 		"headless": true,
 	})
 	defer browser.Close()
-	bc := browser.NewContext()
+	bc := browser.NewSession()
 	defer bc.Close()
 
 	bc.NavigateTo("https://www.duckduckgo.com")
@@ -46,7 +46,7 @@ func TestGetScrollInfo(t *testing.T) {
 		"headless": true,
 	})
 	defer browser.Close()
-	bc := browser.NewContext()
+	bc := browser.NewSession()
 	defer bc.Close()
 
 	pixelsAbove, pixelsBelow, err := bc.GetScrollInfo(bc.GetCurrentPage())
@@ -65,7 +65,7 @@ func TestNavigateTo(t *testing.T) {
 		"headless": true,
 	})
 	defer browser.Close()
-	bc := browser.NewContext()
+	bc := browser.NewSession()
 	defer bc.Close()
 
 	bc.NavigateTo("https://www.google.com")
@@ -81,7 +81,7 @@ func TestClickElementNode(t *testing.T) {
 		"headless": true,
 	})
 	defer browser.Close()
-	bc := browser.NewContext()
+	bc := browser.NewSession()
 	defer bc.Close()
 
 	bc.NavigateTo("https://example.com")
@@ -111,7 +111,7 @@ func TestInputTextElementNode(t *testing.T) {
 		"headless": true,
 	})
 	defer browser.Close()
-	bc := browser.NewContext()
+	bc := browser.NewSession()
 	defer bc.Close()
 
 	bc.NavigateTo("https://www.google.com")
@@ -131,7 +131,7 @@ func TestHighlightElements(t *testing.T) {
 		"headless": true,
 	})
 	defer browser.Close()
-	bc := browser.NewContext()
+	bc := browser.NewSession()
 	defer bc.Close()
 
 	// bc.NavigateTo("https://huggingface.co/")

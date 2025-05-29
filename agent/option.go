@@ -3,6 +3,7 @@ package agent
 import (
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/memory"
+	"github.com/showntop/llmack/pkg/browser"
 	"github.com/showntop/llmack/rag"
 	"github.com/showntop/llmack/storage"
 )
@@ -65,6 +66,8 @@ func WithModel(model *llm.Instance) Option {
 			aa.llm = model
 		} else if at, ok := a.(*Team); ok {
 			at.llm = model
+		} else if ab, ok := a.(*BrowserAgent); ok {
+			ab.llm = model
 		}
 	}
 }
@@ -145,6 +148,14 @@ func WithMemory(memory memory.Memory) Option {
 	return func(a any) {
 		if at, ok := a.(*Agent); ok {
 			at.memory = memory
+		}
+	}
+}
+
+func WithBrowserConfig(config *browser.BrowserConfig) Option {
+	return func(a any) {
+		if at, ok := a.(*BrowserAgent); ok {
+			at.Browser = browser.NewBrowser(*config)
 		}
 	}
 }

@@ -60,6 +60,7 @@ func (rp *funcall) invoke(ctx context.Context, messages []llm.Message, query str
 
 	llmResponse, err := rp.invokeLLM(ctx, messages)
 	if err != nil {
+		rp.reponse.err = err
 		return rp.predictor, false
 	}
 

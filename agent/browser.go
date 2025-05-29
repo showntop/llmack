@@ -12,6 +12,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/google/uuid"
 	"github.com/playwright-community/playwright-go"
+
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/memory"
@@ -19,6 +20,7 @@ import (
 	"github.com/showntop/llmack/program"
 	"github.com/showntop/llmack/storage"
 	"github.com/showntop/llmack/tool"
+	browserTool "github.com/showntop/llmack/tool/browser"
 	"github.com/showntop/llmack/tool/browser/controller"
 )
 
@@ -28,19 +30,31 @@ type BrowserAgent struct {
 
 	BrowserSession *browser.Session
 	Browser        *browser.Browser
-
-	BrowserSession *browser.BrowserSession
 }
 
 // NewBrowserAgent ...
 func NewBrowserAgent(name string, options ...Option) *BrowserAgent {
-	browserInstance := browser.NewBrowser(browser.NewBrowserConfig())
-	return &BrowserAgent{
-		Agent:          *NewAgent(name, options...),
-		Browser:        browserInstance,
-		controller:     controller.NewController(),
-		BrowserSession: browserInstance.NewContext(),
+	agent := &BrowserAgent{
+		Agent:      *NewAgent(name, options...),
+		controller: controller.NewController(),
 	}
+	for _, option := range options { // TODO: 避免重新赋值
+		option(agent)
+	}
+
+	if agent.Browser != nil && agent.Browser.Playwright != nil { // 如果浏览器已经初始化
+		agent.BrowserSession = agent.Browser.NewSession()
+	} else if agent.Browser != nil && agent.Browser.Playwright == nil { // 如果浏览器未初始化
+		browserInstance := browser.NewBrowser(agent.Browser.Config)
+		agent.Browser = browserInstance
+		agent.BrowserSession = browserInstance.NewSession()
+	} else { // 如果浏览器未初始化										// default
+		browserInstance := browser.NewBrowser(browser.NewBrowserConfig())
+		agent.Browser = browserInstance
+		agent.BrowserSession = browserInstance.NewSession()
+	}
+
+	return agent
 }
 
 // Invoke concurrent invoke not support
@@ -120,7 +134,9 @@ func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) 
 	for _, tool := range agent.Tools {
 		tools = append(tools, tool)
 	}
-	tools = append(tools, agent.execActionTool(ctx, actionModel))
+	// tools = append(tools, agent.execActionTool(ctx, actionModel))
+	browserToolName := browserTool.Tools(agent.BrowserSession, actionModel)
+	tools = append(tools, browserToolName)
 	tools = append(tools, agent.getBrowserState())
 
 	prompt := ""
@@ -142,7 +158,7 @@ func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) 
 		WithToolChoice(map[string]any{
 			"type": "function",
 			"function": map[string]any{
-				"name": "AgentOutput",
+				"name": browserToolName,
 			},
 		}).
 		InvokeWithMessages(ctx, agent.getInitialMessages(ctx, task))
@@ -163,22 +179,22 @@ func (agent *BrowserAgent) getInitialMessages(_ context.Context, task string) []
 
 	messages := []llm.Message{llm.NewUserTextMessage(strings.Replace(userTaskPrompt, "{{task}}", task, 1))}
 
-	messages = append(messages, llm.NewAssistantMessage(""))
+	messages = append(messages, llm.NewAssistantMessage("nothing"))
 	messages = append(messages, llm.NewUserTextMessage("Example output: "))
-	args := AgentOutput{
-		CurrentState: &AgentBrain{
+	args := browserTool.ToolParams{
+		Thought: &browserTool.AgentThought{
 			EvaluationPreviousGoal: `Success - I successfully clicked on the 'Apple' link from the Google Search results page, 
-				which directed me to the 'Apple' company homepage. This is a good start toward finding 
-				the best place to buy a new iPhone as the Apple website often list iPhones for sale.`,
+					which directed me to the 'Apple' company homepage. This is a good start toward finding 
+					the best place to buy a new iPhone as the Apple website often list iPhones for sale.`,
 			Memory: `I searched for 'iPhone retailers' on Google. From the Google Search results page, 
-				I used the 'click_element_by_index' tool to click on a element labelled 'Best Buy' but calling 
-				the tool did not direct me to a new page. I then used the 'click_element_by_index' tool to click 
-				on a element labelled 'Apple' which redirected me to the 'Apple' company homepage. 
-				Currently at step 3/15.`,
+					I used the 'click_element_by_index' tool to click on a element labelled 'Best Buy' but calling 
+					the tool did not direct me to a new page. I then used the 'click_element_by_index' tool to click 
+					on a element labelled 'Apple' which redirected me to the 'Apple' company homepage. 
+					Currently at step 3/15.`,
 			NextGoal: `Looking at reported structure of the current page, I can see the item '[127]<h3 iPhone/>' 
-				in the content. I think this button will lead to more information and potentially prices 
-				for iPhones. I'll click on the link to 'iPhone' at index [127] using the 'click_element_by_index' 
-				tool and hope to see prices on the next page.`,
+					in the content. I think this button will lead to more information and potentially prices 
+					for iPhones. I'll click on the link to 'iPhone' at index [127] using the 'click_element_by_index' 
+					tool and hope to see prices on the next page.`,
 		},
 		Actions: []*controller.ActModel{
 			{
@@ -192,18 +208,18 @@ func (agent *BrowserAgent) getInitialMessages(_ context.Context, task string) []
 	if err != nil {
 		panic(err)
 	}
-	exampleToolCallMessage := llm.NewAssistantMessage("").WithToolCalls([]*llm.ToolCall{
+	exampleToolCallMessage := llm.NewAssistantMessage("Success. browser started successfully").WithToolCalls([]*llm.ToolCall{
 		{
 			ID:       "0001",
-			Type:     "tool_call",
-			Function: llm.ToolCallFunction{Name: "AgentOutput", Arguments: string(argsBytes)},
+			Type:     "function",
+			Function: llm.ToolCallFunction{Name: "BrowserUse", Arguments: string(argsBytes)},
 		},
 	})
 	messages = append(messages, exampleToolCallMessage)
 
 	messages = append(messages, llm.NewToolMessage("Browser started", "0001"))
 
-	messages = append(messages, llm.NewUserTextMessage("[Your task history memory starts here]"))
+	// messages = append(messages, llm.NewUserTextMessage("[Your task history memory starts here]"))
 	return messages
 }
 
