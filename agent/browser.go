@@ -103,8 +103,7 @@ func (agent *BrowserAgent) invoke(ctx context.Context, task string, options *Inv
 
 // 迭代一次
 func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) (*AgentRunResponse, error) {
-	// browser state
-	agent.BrowserContext.GetState(true)
+
 	currentPage := agent.BrowserContext.GetCurrentPage()
 	if currentPage == nil {
 		return nil, errors.New("no active page")
@@ -120,6 +119,7 @@ func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) 
 		tools = append(tools, tool)
 	}
 	tools = append(tools, agent.execActionTool(ctx, actionModel))
+	tools = append(tools, agent.getBrowserState())
 
 	prompt := ""
 	if agent.Name != "" {
@@ -217,6 +217,105 @@ type AgentBrain struct {
 type AgentOutput struct {
 	CurrentState *AgentBrain            `json:"current_state"`
 	Actions      []*controller.ActModel `json:"actions" jsonschema:"minItems=1"` // List of actions to execute
+}
+
+func (agent *BrowserAgent) getBrowserState() string {
+	toolx := tool.New(
+		tool.WithName("GetBrowserCurrentState"),
+		tool.WithDescription("Get the current state of the browser."),
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			// browser state
+			browserState := agent.BrowserContext.GetState(true)
+
+			// get specific attribute clickable elements in DomTree as string
+			// elementText := browserState.ElementTree.ClickableElementsToString(amp.IncludeAttributes)
+			elementText := browserState.ElementTree.ClickableElementsToString(nil)
+
+			hasContentAbove := browserState.PixelAbove > 0
+			hasContentBelow := browserState.PixelBelow > 0
+
+			if elementText != "" {
+				if hasContentAbove {
+					elementText = fmt.Sprintf("... %d pixels above - scroll or extract content to see more ...\n%s", browserState.PixelAbove, elementText)
+				} else {
+					elementText = fmt.Sprintf("[Start of page]\n%s", elementText)
+				}
+				// Update elementText by appending the new info to the existing value
+				if hasContentBelow {
+					elementText = fmt.Sprintf("%s\n... %d pixels below - scroll or extract content to see more ...", elementText, browserState.PixelBelow)
+				} else {
+					elementText = fmt.Sprintf("%s\n[End of page]", elementText)
+				}
+			} else {
+				elementText = "empty page"
+			}
+
+			// var stepInfoDescription string
+			// if amp.StepInfo != nil {
+			// 	current := int(amp.StepInfo.StepNumber) + 1
+			// 	max := int(amp.StepInfo.MaxSteps)
+			// 	stepInfoDescription = fmt.Sprintf("Current step: %d/%d", current, max)
+			// } else {
+			// 	stepInfoDescription = ""
+			// }
+			timeStr := time.Now().Format("2006-01-02 15:04")
+			// stepInfoDescription += fmt.Sprintf("Current date and time: %s", timeStr)
+			currentDateAndTime := fmt.Sprintf("Current date and time: %s", timeStr)
+
+			stateDescription := fmt.Sprintf(`
+[Browser Current state was here]
+The following is one-time information - if you need to remember it write it to memory:
+Current url: %s
+Available tabs:
+%s
+Interactive elements from top layer of the current page inside the viewport:
+%s
+%s`,
+				browserState.Url,
+				browser.TabsToString(browserState.Tabs),
+				elementText,
+				currentDateAndTime,
+			)
+
+			// if amp.Result != nil {
+			// 	for i, result := range amp.Result {
+			// 		if result.ExtractedContent != nil {
+			// 			stateDescription += fmt.Sprintf("\nAction result %d/%d: %s", i+1, len(amp.Result), *result.ExtractedContent)
+			// 		}
+			// 		if result.Error != nil {
+			// 			// only use last line of error
+			// 			errStr := *result.Error
+			// 			splitted := strings.Split(errStr, "\n")
+			// 			lastLine := splitted[len(splitted)-1]
+			// 			stateDescription += fmt.Sprintf("\nAction error %d/%d: ...%s", i+1, len(amp.Result), lastLine)
+			// 		}
+			// 	}
+			// }
+
+			// if amp.State.Screenshot != nil && useVision {
+			// 	// Format message for vision model
+			// 	return &schema.Message{
+			// 		Role: schema.User,
+			// 		MultiContent: []schema.ChatMessagePart{
+			// 			{
+			// 				Type: schema.ChatMessagePartTypeText,
+			// 				Text: stateDescription,
+			// 			},
+			// 			{
+			// 				Type: schema.ChatMessagePartTypeImageURL,
+			// 				ImageURL: &schema.ChatMessageImageURL{
+			// 					URL: "data:image/png;base64," + *amp.State.Screenshot,
+			// 				},
+			// 			},
+			// 		},
+			// 	}
+			// }
+
+			return stateDescription, nil
+		}),
+	)
+	tool.Register(toolx)
+	return toolx.Name
 }
 
 func (agent *BrowserAgent) execActionTool(_ context.Context, customActions *controller.ActionModel) string {

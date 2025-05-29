@@ -17,7 +17,7 @@ import (
 
 var IN_DOCKER = os.Getenv("IN_DOCKER") == "true"
 
-type BrowserConfig = map[string]interface{}
+type BrowserConfig = map[string]any
 
 func NewBrowserConfig() BrowserConfig {
 	return BrowserConfig{

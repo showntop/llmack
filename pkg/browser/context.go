@@ -252,7 +252,7 @@ func (bc *BrowserContext) GetSession() *BrowserSession {
 	return bc.Session
 }
 
-// Get the current page
+// GetCurrentPage Get the current page
 func (bc *BrowserContext) GetCurrentPage() playwright.Page {
 	session := bc.GetSession()
 	return bc.getCurrentPage(session)

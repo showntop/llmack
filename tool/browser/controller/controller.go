@@ -188,6 +188,9 @@ func (c *Controller) InputText(ctx context.Context, params InputTextAction) (*Ac
 		return nil, err
 	}
 	selectorMap := bc.GetSelectorMap()
+	if selectorMap == nil {
+		return nil, errors.New("no selector map found")
+	}
 	if (*selectorMap)[params.Index] == nil {
 		return nil, errors.New("element with index " + strconv.Itoa(params.Index) + " does not exist")
 	}
@@ -218,6 +221,8 @@ func (c *Controller) SearchGoogle(ctx context.Context, params SearchGoogleAction
 	msg := fmt.Sprintf("🔍  Searched for \"%s\" in Google", params.Query)
 	log.Debug(msg)
 	actionResult := NewActionResult()
+	actionResult.Success = playwright.Bool(true)
+	actionResult.IsDone = playwright.Bool(true)
 	actionResult.ExtractedContent = &msg
 	actionResult.IncludeInMemory = true
 	return actionResult, nil
