@@ -28,6 +28,8 @@ type BrowserAgent struct {
 
 	BrowserContext *browser.BrowserContext
 	Browser        *browser.Browser
+
+	BrowserSession *browser.BrowserSession
 }
 
 // NewBrowserAgent ...
