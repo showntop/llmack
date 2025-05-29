@@ -42,8 +42,8 @@ func NewActionResult() *ActionResult {
 	}
 }
 
-func getBrowserContext(ctx context.Context) (*browser.BrowserContext, error) {
-	if bc, ok := ctx.Value(browserKey).(*browser.BrowserContext); ok {
+func getBrowserContext(ctx context.Context) (*browser.Session, error) {
+	if bc, ok := ctx.Value(browserKey).(*browser.Session); ok {
 		return bc, nil
 	}
 	return nil, errors.New("browserContext is not found")
@@ -91,7 +91,7 @@ type ActionFunc[T, D any] func(ctx context.Context, input T) (output D, err erro
 // Act
 func (c *Controller) ExecuteAction(
 	action *ActModel,
-	browserContext *browser.BrowserContext,
+	browserContext *browser.Session,
 	model *llm.Instance,
 	sensitiveData map[string]string,
 	availableFilePaths []string,
@@ -138,7 +138,7 @@ func (c *Controller) ClickElementByIndex(ctx context.Context, params ClickElemen
 	if err != nil {
 		return nil, err
 	}
-	session := bc.GetSession()
+	session := bc.GetContext()
 	initialPages := len(session.Context.Pages())
 
 	elementNode, err := bc.GetDomElementByIndex(params.Index)

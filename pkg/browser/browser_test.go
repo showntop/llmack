@@ -89,7 +89,7 @@ func TestClickElementNode(t *testing.T) {
 	currentState := bc.GetState(false)
 	time.Sleep(1 * time.Second)
 
-	session := bc.GetSession()
+	session := bc.GetContext()
 	session.CachedState = currentState
 
 	processor := &dom.ClickableElementProcessor{}

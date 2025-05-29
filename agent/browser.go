@@ -26,7 +26,7 @@ type BrowserAgent struct {
 	Agent
 	controller *controller.Controller
 
-	BrowserContext *browser.BrowserContext
+	BrowserSession *browser.Session
 	Browser        *browser.Browser
 }
 
@@ -37,7 +37,7 @@ func NewBrowserAgent(name string, options ...Option) *BrowserAgent {
 		Agent:          *NewAgent(name, options...),
 		Browser:        browserInstance,
 		controller:     controller.NewController(),
-		BrowserContext: browserInstance.NewContext(),
+		BrowserSession: browserInstance.NewContext(),
 	}
 }
 
@@ -104,7 +104,7 @@ func (agent *BrowserAgent) invoke(ctx context.Context, task string, options *Inv
 // 迭代一次
 func (agent *BrowserAgent) retry(ctx context.Context, task string, stream bool) (*AgentRunResponse, error) {
 
-	currentPage := agent.BrowserContext.GetCurrentPage()
+	currentPage := agent.BrowserSession.GetCurrentPage()
 	if currentPage == nil {
 		return nil, errors.New("no active page")
 	}
@@ -225,7 +225,7 @@ func (agent *BrowserAgent) getBrowserState() string {
 		tool.WithDescription("Get the current state of the browser."),
 		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
 			// browser state
-			browserState := agent.BrowserContext.GetState(true)
+			browserState := agent.BrowserSession.GetState(true)
 
 			// get specific attribute clickable elements in DomTree as string
 			// elementText := browserState.ElementTree.ClickableElementsToString(amp.IncludeAttributes)
@@ -328,7 +328,7 @@ func (agent *BrowserAgent) execActionTool(_ context.Context, customActions *cont
 			return "", err
 		}
 
-		cachedSelectorMap := agent.BrowserContext.GetSelectorMap()
+		cachedSelectorMap := agent.BrowserSession.GetSelectorMap()
 		cachedPathHashes := mapset.NewSet[string]()
 		if cachedSelectorMap != nil {
 			for _, e := range *cachedSelectorMap {
@@ -336,11 +336,11 @@ func (agent *BrowserAgent) execActionTool(_ context.Context, customActions *cont
 			}
 		}
 
-		agent.BrowserContext.RemoveHighlights()
+		agent.BrowserSession.RemoveHighlights()
 
 		for i, action := range params.Actions {
 			if action.GetIndex() != nil && i != 0 {
-				newState := agent.BrowserContext.GetState(false)
+				newState := agent.BrowserSession.GetState(false)
 				newSelectorMap := newState.SelectorMap
 
 				// Detect index change after previous action
@@ -380,7 +380,7 @@ func (agent *BrowserAgent) execActionTool(_ context.Context, customActions *cont
 				}
 			}
 			model := agent.llm
-			result, err := agent.controller.ExecuteAction(action, agent.BrowserContext, model, nil, nil)
+			result, err := agent.controller.ExecuteAction(action, agent.BrowserSession, model, nil, nil)
 			if err != nil {
 				// TODO(LOW): implement signal handler error
 				// log.Infof("Action %d was cancelled due to Ctrl+C", i+1)

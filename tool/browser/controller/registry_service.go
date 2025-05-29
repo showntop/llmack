@@ -65,7 +65,7 @@ const (
 func (r *Registry) ExecuteAction(
 	actionName string,
 	argumentsInJson string,
-	browser *browser.BrowserContext,
+	browser *browser.Session,
 	model *llm.Instance,
 	sensitiveData map[string]string,
 	availableFilePaths []string,

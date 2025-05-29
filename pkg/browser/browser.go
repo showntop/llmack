@@ -26,6 +26,10 @@ func NewBrowserConfig() BrowserConfig {
 		"browser_class":    "chromium",
 		"is_mobile":        false,
 		"has_touch":        false,
+		"browser_screen_size": map[string]any{
+			"width":  1200,
+			"height": 800,
+		},
 	}
 }
 
@@ -48,12 +52,12 @@ func NewBrowser(customConfig BrowserConfig) *Browser {
 	}
 }
 
-func (b *Browser) NewContext() *BrowserContext {
-	return &BrowserContext{
-		ContextId: uuid.New().String(),
+func (b *Browser) NewContext() *Session {
+	return &Session{
+		ContextID: uuid.New().String(),
 		Config:    b.Config,
 		Browser:   b,
-		Session:   nil,
+		Context:   nil,
 		State:     &BrowserContextState{},
 	}
 }
