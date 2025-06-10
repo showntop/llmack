@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -56,7 +54,7 @@ func NewRegisteredAction[T, D any](
 		return string(output), nil
 	}
 
-	schemaCustomizer := defaultSchemaCustomizer
+	schemaCustomizer := tool.DefaultSchemaCustomizer
 
 	sc, err := openapi3gen.NewSchemaRefForValue(structx.NewInstance[T](), nil, openapi3gen.SchemaCustomizer(schemaCustomizer))
 	if err != nil {
@@ -255,94 +253,4 @@ func (ar *ActionRegistry) GetPromptDescription(page playwright.Page) string {
 		descriptions = append(descriptions, action.PromptDescription())
 	}
 	return strings.Join(descriptions, "\n")
-}
-
-// defaultSchemaCustomizer is the default schema customizer when using reflect to infer tool parameter from tagged go struct.
-// Supported struct tags:
-// 1. jsonschema: "description=xxx"
-// 2. jsonschema: "enum=xxx,enum=yyy,enum=zzz"
-// 3. jsonschema: "required"
-// 4. can also use json: "xxx,omitempty" to mark the field as not required, which means an absence of 'omitempty' in json tag means the field is required.
-// If this defaultSchemaCustomizer is not sufficient or suitable to your specific need, define your own SchemaCustomizerFn and pass it to WithSchemaCustomizer during InferTool or InferStreamTool.
-func defaultSchemaCustomizer(name string, t reflect.Type, tag reflect.StructTag, schema *openapi3.Schema) error {
-	jsonS := tag.Get("jsonschema")
-	if len(jsonS) > 0 {
-		tags := strings.Split(jsonS, ",")
-		for _, t := range tags {
-			kv := strings.Split(t, "=")
-			if len(kv) == 2 {
-				if kv[0] == "description" {
-					schema.Description = kv[1]
-				}
-				if kv[0] == "enum" {
-					schema.Enum = append(schema.Enum, kv[1])
-				}
-			} else if len(kv) == 1 {
-				if kv[0] == "required" {
-					if schema.Extensions == nil {
-						schema.Extensions = make(map[string]any, 1)
-					}
-					schema.Extensions["x_required"] = true
-				}
-			}
-		}
-	}
-
-	json := tag.Get("json")
-	if len(json) > 0 && !strings.Contains(json, "omitempty") {
-		if schema.Extensions == nil {
-			schema.Extensions = make(map[string]any, 1)
-		}
-		schema.Extensions["x_required"] = true
-	}
-
-	if name == "_root" {
-		if err := setRequired(schema); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func setRequired(sc *openapi3.Schema) error { // check if properties are marked as required, set schema required to true accordingly
-	if sc.Type != openapi3.TypeObject && sc.Type != openapi3.TypeArray {
-		return nil
-	}
-
-	if sc.Type == openapi3.TypeArray {
-		if sc.Items.Value.Extensions != nil {
-			if _, ok := sc.Items.Value.Extensions["x_required"]; ok {
-				delete(sc.Items.Value.Extensions, "x_required")
-				if len(sc.Items.Value.Extensions) == 0 {
-					sc.Items.Value.Extensions = nil
-				}
-			}
-		}
-
-		if err := setRequired(sc.Items.Value); err != nil {
-			return fmt.Errorf("setRequired for array failed: %w", err)
-		}
-	}
-
-	for k, p := range sc.Properties {
-		if p.Value.Extensions != nil {
-			if _, ok := p.Value.Extensions["x_required"]; ok {
-				sc.Required = append(sc.Required, k)
-				delete(p.Value.Extensions, "x_required")
-				if len(p.Value.Extensions) == 0 {
-					p.Value.Extensions = nil
-				}
-			}
-
-		}
-		err := setRequired(p.Value)
-		if err != nil {
-			return fmt.Errorf("setRequired for nested property %s failed: %w", k, err)
-		}
-	}
-
-	sort.Strings(sc.Required)
-
-	return nil
 }
