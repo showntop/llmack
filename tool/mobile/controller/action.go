@@ -13,6 +13,7 @@ import (
 type ActionFunc[T, D any] func(ctx context.Context, input T) (output D, err error)
 
 type Action struct {
+	Name string
 	Tool *tool.Tool
 }
 
@@ -53,13 +54,7 @@ func NewAction[T, D any](name string, description string, actionFunc ActionFunc[
 	)
 
 	return &Action{
+		Name: name,
 		Tool: tool,
 	}, nil
-}
-
-type ActionResult struct {
-	IsDone           *bool   `json:"is_done,omitempty"`
-	Success          *bool   `json:"success,omitempty"`
-	ExtractedContent *string `json:"extracted_content,omitempty"`
-	Error            *string `json:"error,omitempty"`
 }

@@ -9,18 +9,20 @@ import (
 
 // predictor ...
 type predictor struct {
-	Mode       string
-	stream     bool
-	toolChoice any
-	model      *llm.Instance
-	adapter    Adapter
-	inputs     map[string]any
-	observers  []llm.Message
-	tools      []any
+	Mode            string
+	stream          bool
+	toolChoice      any
+	model           *llm.Instance
+	maxIterationNum int
+	adapter         Adapter
+	inputs          map[string]any
+	observers       []llm.Message
+	tools           []any
 	Promptx
 
-	invoker Invoker
-	reponse *Response
+	resetMessages func(ctx context.Context, messages []llm.Message) []llm.Message
+	invoker       Invoker
+	reponse       *Response
 }
 
 // Invoker 定义了 predictor 的调用方式

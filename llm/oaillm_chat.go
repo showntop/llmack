@@ -1,6 +1,9 @@
 package llm
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // ChatCompletionRequest represents a request structure for chat completion API.
 type ChatCompletionRequest struct {
@@ -35,16 +38,22 @@ func (c *ChatCompletionMessage) MarshalJSON() ([]byte, error) {
 	if len(c.MultipartContent) > 0 {
 		parts := []map[string]any{}
 		for _, part := range c.MultipartContent {
+			fmt.Println("part.Type: ", part.Type)
+			fmt.Println("part.Data: ", part.Data)
 			if part.Type == "text" {
 				parts = append(parts, map[string]any{
 					"type": part.Type,
 					"text": part.Data,
 				})
-			}
-			if part.Type == "image_url" {
+			} else if part.Type == "image_url" {
 				parts = append(parts, map[string]any{
 					"type":      part.Type,
 					"image_url": part.Data,
+				})
+			} else {
+				parts = append(parts, map[string]any{
+					"type":    part.Type,
+					part.Type: part.Data,
 				})
 			}
 		}

@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 )
@@ -16,13 +17,39 @@ const (
 
 type MultipartContent struct {
 	Type string
-	Data string
+	Data any
 }
 
 func MultipartContentImageURL(url string) *MultipartContent {
 	return &MultipartContent{
 		Type: "image_url",
 		Data: url,
+	}
+}
+
+func MultipartContentCustom(typ string, content string) *MultipartContent {
+	return &MultipartContent{
+		Type: typ,
+		Data: content,
+	}
+}
+
+func MultipartContentImageBase64(format string, data []byte) *MultipartContent {
+	if len(data) == 0 {
+		return &MultipartContent{
+			Type: "image_url",
+			Data: map[string]any{
+				"url": nil,
+			},
+		}
+	}
+	header := fmt.Sprintf("data:image/%s;base64,", format)
+
+	return &MultipartContent{
+		Type: "image_url",
+		Data: map[string]any{
+			"url": header + base64.StdEncoding.EncodeToString(data),
+		},
 	}
 }
 

@@ -63,9 +63,10 @@ func NewAgent(name string, options ...Option) *Agent {
 }
 
 type InvokeOptions struct {
-	SessionID string `json:"session_id"` // 会话ID, for 持久化信息
-	Retries   int    `json:"retries"`    // 重试次数
-	Stream    bool   `json:"stream"`     // 是否流式输出
+	SessionID       string `json:"session_id"`        // 会话ID, for 持久化信息
+	Retries         int    `json:"retries"`           // 重试次数
+	Stream          bool   `json:"stream"`            // 是否流式输出
+	MaxIterationNum int    `json:"max_iteration_num"` // 最大迭代次数
 }
 
 type InvokeOption func(*InvokeOptions)
@@ -73,6 +74,12 @@ type InvokeOption func(*InvokeOptions)
 func WithSessionID(sessionID string) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.SessionID = sessionID
+	}
+}
+
+func WithMaxIterationNum(num int) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.MaxIterationNum = num
 	}
 }
 

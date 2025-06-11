@@ -29,9 +29,10 @@ func (rp *funcall) Invoke(ctx context.Context, messages []llm.Message, query str
 	// at end recycle response stream
 	defer close(rp.reponse.stream)
 
+	maxIterationNum := min(rp.maxIterationNum, MaxIterationNum)
 	// 迭代次数
-	for i := range MaxIterationNum {
-		if i == MaxIterationNum-1 { // remove tool
+	for i := range maxIterationNum {
+		if i == maxIterationNum-1 { // remove tool
 			rp.tools = []any{}
 		}
 		p, finish := rp.invoke(ctx, messages, query, inputs)
@@ -111,7 +112,7 @@ func (rp *funcall) invoke(ctx context.Context, messages []llm.Message, query str
 			rp.reponse.err = err
 			return rp.predictor, finish
 		}
-		// log.InfoContextf(ctx, "program funcall invoke tools result %v", toolResults)
+		log.InfoContextf(ctx, "program funcall invoke tools result %v", toolResults)
 		// 记录工具调用
 		for i := range toolCalls {
 			rp.observers = append(rp.observers, llm.NewToolMessage(toolResults[toolCalls[i].ID], toolCalls[i].ID))
@@ -132,6 +133,9 @@ func (rp *funcall) invokeLLM(ctx context.Context, messages []llm.Message) (*llm.
 	}
 	// append observer message
 	messages = append(messages, rp.observers...)
+	if rp.resetMessages != nil {
+		messages = rp.resetMessages(ctx, messages)
+	}
 	response, err := rp.model.Invoke(ctx, messages,
 		llm.WithTools(messageTools...),
 		llm.WithStream(true),

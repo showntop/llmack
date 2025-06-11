@@ -219,6 +219,9 @@ func Tools(browserSession *browser.Session, supportedActions *controller.ActionM
 		// llm:            llm.NewInstance("gpt-4o-mini"),
 		BrowserSession: browserSession,
 	}
+	if supportedActions == nil {
+		supportedActions = browserTool.controller.Registry.CreateActionModel(nil, browserSession.GetCurrentPage())
+	}
 
 	actionSchemas := map[string]*openapi3.SchemaRef{}
 	for _, action := range supportedActions.Actions {
@@ -260,7 +263,7 @@ func Tools(browserSession *browser.Session, supportedActions *controller.ActionM
 
 	tl := tool.New(
 		tool.WithName("BrowserUse"),
-		tool.WithDescription("Use Browser to do some actions(supported actions list see actions field)."),
+		tool.WithDescription("Use Browser to do some actions(supported actions list see actions field).\n"+prompt),
 		tool.WithParameters(
 			&openapi3.Schema{
 				Type: openapi3.TypeObject,
@@ -290,3 +293,48 @@ func Tools(browserSession *browser.Session, supportedActions *controller.ActionM
 
 	return tl.Name
 }
+
+var prompt = `
+You must follow the following rules:
+# Rules
+2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.
+Common action sequences:
+
+- Form filling: [{"input_text": {"index": 1, "text": "username"}}, {"input_text": {"index": 2, "text": "password"}}, {"click_element_by_index": {"index": 3}}]
+- Navigation and extraction: [{"go_to_url": {"url": "https://example.com"}}, {"extract_content": {"goal": "extract the names"}}]
+- Actions are executed in the given order
+- If the page changes after an action, the sequence is interrupted and you get the new state.
+- Only provide the action sequence until an action which changes the page state significantly.
+- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
+- only use multiple actions if it makes sense.
+
+3. ELEMENT INTERACTION:
+
+- Only use indexes of the interactive elements
+
+4. NAVIGATION & ERROR HANDLING:
+
+- If no suitable elements exist, use other functions to complete the task
+- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- Handle popups/cookies by accepting or closing them
+- Use scroll to find elements you are looking for
+- If you want to research something, open a new tab instead of using the current tab
+- If captcha pops up, try to solve it - else try a different approach
+- If the page is not fully loaded, use wait action
+
+
+6. VISUAL CONTEXT:
+
+- When an image is provided, use it to understand the page layout
+- Bounding boxes with labels on their top right corner correspond to element indexes
+
+7. Form filling:
+
+- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.
+
+
+9. Extraction:
+
+- If your task is to find information - call extract_content on the specific pages to get and store the information.
+  Your responses must be always JSON with the specified format.
+`

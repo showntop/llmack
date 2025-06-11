@@ -56,7 +56,6 @@ func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest
 	// payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
 	// payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
 	// payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
-
 	log.InfoContextf(ctx, "OAILLM ChatCompletions request payload %s", string(payload)) // for debug
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", o.baseURL, bytes.NewReader(payload))
 	if err != nil {
@@ -141,7 +140,7 @@ func (o *OAILLM) handleStreamResponse(body io.ReadCloser) (*Response, error) {
 func readLine(reader *bufio.Reader) ([]byte, error) {
 
 	var (
-		headerData  = []byte("data: ")
+		headerData  = []byte("data:") // TODO FIX for some api not have space after :
 		errorPrefix = []byte(`data: {"error":`)
 	)
 
@@ -179,6 +178,7 @@ READ:
 	}
 
 	noPrefixLine := bytes.TrimPrefix(noSpaceLine, headerData)
+	noPrefixLine = bytes.TrimPrefix(noPrefixLine, []byte(" "))
 	if string(noPrefixLine) == "[DONE]" {
 		return nil, io.EOF
 	}

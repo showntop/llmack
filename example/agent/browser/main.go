@@ -32,11 +32,11 @@ func main() {
 		// agent.WithModel(llm.NewInstance(qwen.Name, llm.WithDefaultModel("qwen-vl-max-latest"))),
 		agent.WithModel(llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))),
 		agent.WithBrowserConfig(&browser.BrowserConfig{
-			"headless": true,
+			"headless": false,
 		}),
 	)
 
-	response := browserAgent.Invoke(context.Background(), "Find todays DOW stock price")
+	response := browserAgent.Invoke(context.Background(), "去美团外卖查找所有烤鸭店的电话号码、名称、地址")
 	if response.Error != nil {
 		panic(response.Error)
 	}
