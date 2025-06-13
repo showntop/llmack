@@ -22,14 +22,17 @@ import (
 type MobileAgent struct {
 	Agent
 	// controller *controller.Controller
-	mobile *adb.Controller
+	mobileController *adb.Controller
+	adbTool          *adb.AdbTool
 }
 
 // NewMobileAgent ...
 func NewMobileAgent(name string, options ...Option) *MobileAgent {
+	ctrl := adb.NewController("emulator-5554")
 	agent := &MobileAgent{
-		Agent: *NewAgent(name, options...),
-		// mobile: adb.NewController(""),
+		Agent:            *NewAgent(name, options...),
+		mobileController: ctrl,
+		adbTool:          adb.NewAdbTool(ctrl),
 	}
 	for _, option := range options { // TODO: 避免重新赋值
 		option(agent)
@@ -106,8 +109,8 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 		tools = append(tools, tool)
 	}
 	// tools = append(tools, agent.execActionTool(ctx, actionModel))
-	mobileToolName := adb.NewTools("xxx")
-	tools = append(tools, mobileToolName, agent.getLayoutAndCoordinates())
+	mobileToolName := agent.adbTool.NewTools()
+	tools = append(tools, mobileToolName...)
 	// tools = append(tools, agent.getMobileState())
 
 	prompt := ""
@@ -122,13 +125,32 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 	prompt += androidAgentInstruction
 	predictor := program.FunCall(
 		program.WithLLMInstance(agent.llm),
-		program.WithMaxIterationNum(10),
+		program.WithMaxIterationNum(50),
 		program.WithResetMessages(func(ctx context.Context, messages []llm.Message) []llm.Message {
+			screenshot, err := agent.adbTool.GetMobileCurrentScreenshot(ctx)
+			if err != nil {
+				return messages
+			}
+			elements, err := agent.adbTool.GetMobileCurrentClickableElements(ctx)
+			if err != nil {
+				return messages
+			}
+			elementsJSON, err := json.Marshal(elements)
+			if err != nil {
+				return messages
+			}
+			state, err := agent.adbTool.GetMobileCurrentPhoneState(ctx)
+			if err != nil {
+				return messages
+			}
+			stateJSON, err := json.Marshal(state)
+			if err != nil {
+				return messages
+			}
 			messages = append(messages, llm.NewUserMultipartMessage(
-				llm.MultipartContentImageBase64("png", agent.mobile.GetCurrentScreenshot(ctx)),
-				llm.MultipartContentText(fmt.Sprintf(`{
-					"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
-				}`, 1080, 1920)),
+				llm.MultipartContentImageBase64("png", screenshot),
+				llm.MultipartContentText(fmt.Sprintf(`the current clickable elements: \n %s`, elementsJSON)),
+				llm.MultipartContentText(fmt.Sprintf(`the current phone state: \n %s`, stateJSON)),
 			))
 			return messages
 		}),
@@ -136,13 +158,13 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 		// WithInputs(input).
 		WithTools(tools...).
 		WithStream(stream).
-		WithToolChoice("auto").
-		// WithToolChoice(map[string]any{
-		// 	"type": "function",
-		// 	"function": map[string]any{
-		// 		"name": mobileToolName,
-		// 	},
-		// }).
+		// WithToolChoice("auto").
+		WithToolChoice(map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name": mobileToolName,
+			},
+		}).
 		InvokeWithMessages(ctx, agent.getInitialMessages(ctx, task))
 	if predictor.Error() != nil {
 		agent.response.Error = predictor.Error()
@@ -163,46 +185,46 @@ func (agent *MobileAgent) getInitialMessages(ctx context.Context, task string) [
 
 	// messages = append(messages, llm.NewAssistantMessage("nothing"))
 	// messages = append(messages, llm.NewUserTextMessage("Example output: "))
-	args := adbTool.ToolParams{
-		Thought: &adbTool.AgentThought{
-			EvaluationPreviousGoal: `Success - I successfully launched the mobile phone.`,
-			Memory:                 `I successfully launched the mobile phone.`,
-			CurrentGoal:            `screenshot the current screen.`,
-		},
-		Actions: []map[string]any{
-			{
-				"name": "launch_mobile",
-			},
-		},
-	}
-	argsBytes, err := json.Marshal(args)
-	if err != nil {
-		panic(err)
-	}
-	exampleToolCallMessage := llm.NewAssistantMessage("I should first launch the mobile phone").WithToolCalls([]*llm.ToolCall{
-		{
-			ID:       "0001",
-			Type:     "function",
-			Function: llm.ToolCallFunction{Name: "MobileUse", Arguments: string(argsBytes)},
-		},
-	})
-	messages = append(messages, exampleToolCallMessage)
+	// args := adb.ToolParams{
+	// 	Thought: &adb.AgentThought{
+	// 		EvaluationPreviousGoal: `Success - I successfully launched the mobile phone.`,
+	// 		Memory:                 `I successfully launched the mobile phone.`,
+	// 		CurrentGoal:            `screenshot the current screen.`,
+	// 	},
+	// 	Actions: []map[string]any{
+	// 		{
+	// 			"name": "launch_mobile",
+	// 		},
+	// 	},
+	// }
+	// argsBytes, err := json.Marshal(args)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// exampleToolCallMessage := llm.NewAssistantMessage("I should first launch the mobile phone").WithToolCalls([]*llm.ToolCall{
+	// 	{
+	// 		ID:       "0001",
+	// 		Type:     "function",
+	// 		Function: llm.ToolCallFunction{Name: "MobileUse", Arguments: string(argsBytes)},
+	// 	},
+	// })
+	// messages = append(messages, exampleToolCallMessage)
 
-	messages = append(messages, llm.NewToolMessage(`I successfully launched the mobile phone.`, "0001"))
+	// messages = append(messages, llm.NewToolMessage(`I successfully launched the mobile phone.`, "0001"))
 	// messages = append(messages, llm.NewToolMessage(fmt.Sprintf(`{
 	// 	"message": "I successfully launched the mobile phone.",
 	// 	"current_state": %q,
 	// 	"next_goal": %q
 	// }`, agent.mobile.GetCurrentState(ctx), task), "0001"))
-	messages = append(messages, llm.NewUserMultipartMessage(
-		llm.MultipartContentImageBase64("png", agent.mobile.GetCurrentScreenshot(ctx)),
-		// llm.MultipartContentCustom("png", agent.mobile.GetCurrentScreenshot(ctx)),
-		llm.MultipartContentText(fmt.Sprintf(`{
-			"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
-		}`, 1080, 1920)),
-		// llm.MultipartContentText(fmt.Sprintf(`the current active element: \n %s`,
-		// 	agent.mobile.GetCurrentClickableElements(ctx))),
-	))
+	// messages = append(messages, llm.NewUserMultipartMessage(
+	// 	// llm.MultipartContentImageBase64("png", agent.mobile.GetCurrentScreenshot(ctx)),
+	// 	// llm.MultipartContentCustom("png", agent.mobile.GetCurrentScreenshot(ctx)),
+	// 	llm.MultipartContentText(fmt.Sprintf(`{
+	// 		"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
+	// 	}`, 1080, 2400)),
+	// 	// llm.MultipartContentText(fmt.Sprintf(`the current active element: \n %s`,
+	// 	// 	agent.mobile.GetCurrentClickableElements(ctx))),
+	// ))
 
 	// messages = append(messages, llm.NewUserTextMessage("[Your task history memory starts here]"))
 	return messages
@@ -211,26 +233,29 @@ func (agent *MobileAgent) getInitialMessages(ctx context.Context, task string) [
 func (agent *MobileAgent) getLayoutAndCoordinates() string {
 	model := llm.NewInstance(doubao.Name, llm.WithDefaultModel("doubao-1-5-ui-tars-250428"))
 	function := func(ctx context.Context, args string) (string, error) {
-		screenshot := agent.mobile.GetCurrentScreenshot(ctx)
+		// screenshot := agent.mobile.GetCurrentScreenshot(ctx)
 		// TODO: get layout and coordinates
 		response, err := model.Invoke(ctx, []llm.Message{
 			llm.NewSystemMessage(`
 You are a GUI agent that can get the layout and coordinates of an element on the screenshot by the task given to you.
+You should more precisely with pixel-level analysis.
+Answer in chinese.
 			`),
 
-			llm.NewUserTextMessage(fmt.Sprintf("the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task", 1080, 1920)),
+			// llm.NewUserTextMessage(fmt.Sprintf("the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task", 1080, 2400)),
 			llm.NewUserMultipartMessage(
-				llm.MultipartContentImageBase64("png", screenshot),
+				// llm.MultipartContentImageBase64("png", screenshot),
 				llm.MultipartContentText(fmt.Sprintf(`{
 					"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
-				}`, 1080, 1920)),
+				}`, 1080, 2400)),
 				llm.MultipartContentText(fmt.Sprintf(`Your task is: %s`, args)),
 			),
 		}, llm.WithStream(true))
 		if err != nil {
 			return "", err
 		}
-		return response.Result().Message.Content(), nil
+		result := response.Result()
+		return "reasoning: " + result.Message.ReasoningContent + "\n" + "answer: " + result.Message.Content(), nil
 	}
 	toolx := tool.New(
 		tool.WithName("GetLayoutAndCoordinates"),
@@ -306,30 +331,6 @@ func (agent *MobileAgent) fetchOrCreateSession(ctx context.Context, sessionID st
 
 var (
 	androidAgentInstruction = `
-1. Your goal is to accomplish the ultimate task using the mobile device with the following actions:
-- You can use the mobile device to take screenshot.
-- You can use the mobile device to tap on elements.
-- You can use the mobile device to input text.
-- You can use the mobile device's browser to go to a url.
-
-<tool_rules>
-1. You can use the following tools to complete the task:
-- GetLayoutAndCoordinates
-- MobileUse
-2. When you need the layout and coordinates of an element from a screenshot, you must use the GetLayoutAndCoordinates tool.
-</tool_rules>
-
-<action_rules>
-1. You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. 
-2. Common action sequences:
-	- Take screenshot: [{\"take_screenshot\": {}}]
-	- Tap on element: [{\"tap_by_coordinates\": {\"x\": 100, \"y\": 100, \"duration\": 100}}]
-3. Actions are executed in the given order
-4. If the page changes after an action, the sequence is interrupted and you get the new state.
-5. Only provide the action sequence until an action which changes the page state significantly.
-6. Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
-7. only use multiple actions if it makes sense.
-8. Only use indexes of the interactive elements
-</action_rules>
+You are a GUI agent that can use mobile device to automate tasks.
 	`
 )

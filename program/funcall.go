@@ -200,6 +200,9 @@ func (rp *funcall) renderContexts(ctx context.Context, settings any, query strin
 func (rp *funcall) buildTools(tools ...any) []*llm.Tool {
 	messageTools := make([]*llm.Tool, 0)
 	for _, tl := range tools {
+		if tl == nil {
+			continue
+		}
 		tool := tool.Spawn(tl.(string)) // 暂时只支持 string
 		messageTool := &llm.Tool{
 			Type: "function",

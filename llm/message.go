@@ -23,7 +23,9 @@ type MultipartContent struct {
 func MultipartContentImageURL(url string) *MultipartContent {
 	return &MultipartContent{
 		Type: "image_url",
-		Data: url,
+		Data: map[string]any{
+			"url": url,
+		},
 	}
 }
 

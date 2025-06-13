@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"git.code.oa.com/trpc-go/trpc-naming-polaris/registry"
 	"github.com/showntop/llmack/pkg/adb"
 )
 
@@ -28,7 +27,6 @@ type Controller struct {
 }
 
 func NewController(serial string) *Controller {
-	registry := registry.NewRegistry()
 
 	ctrl := &Controller{
 		Serial:            serial,
@@ -36,8 +34,63 @@ func NewController(serial string) *Controller {
 		ClickableElements: make([]UIElement, 0),
 	}
 
-	RegisterTool(registry, "get_clickables", "获取可点击的 UI 元素", ctrl.GetClickables)
+	if registry != nil {
+		var err error
+		// err := RegisterTool(registry, "get_clickable_elements", "获取可点击的 UI 元素", ctrl.GetClickableElements)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		err = RegisterTool(registry, "tap_by_index", "通过元素索引点击元素", ctrl.TapByIndex)
+		if err != nil {
+			panic(err)
+		}
+		// err = RegisterTool(registry, "tap_by_coordinates", "通过坐标点击元素", ctrl.TapByCoordinates)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		err = RegisterTool(registry, "swipe", "滑动", ctrl.Swipe)
+		if err != nil {
+			panic(err)
+		}
+		err = RegisterTool(registry, "input_text", "输入文本", ctrl.InputText)
+		if err != nil {
+			panic(err)
+		}
+		err = RegisterTool(registry, "press_key", "按键", ctrl.PressKey)
+		if err != nil {
+			panic(err)
+		}
+		err = RegisterTool(registry, "start_app", "启动应用", ctrl.StartApp)
+		if err != nil {
+			panic(err)
+		}
+		err = RegisterTool(registry, "install_app", "安装应用", ctrl.InstallApp)
+		if err != nil {
+			panic(err)
+		}
+		// err = RegisterTool(registry, "take_screenshot", "截屏", ctrl.TakeScreenshot)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		err = RegisterTool(registry, "list_packages", "列出包", ctrl.ListPackages)
+		if err != nil {
+			panic(err)
+		}
+		err = RegisterTool(registry, "complete", "完成任务", ctrl.Complete)
+		if err != nil {
+			panic(err)
+		}
+		// err = RegisterTool(registry, "get_phone_state", "获取手机状态", ctrl.GetPhoneState)
+		// if err != nil {
+		// 	panic(err)
+		// }
+	}
 	return ctrl
+}
+
+type ActionResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }
 
 // UIElement UI 元素结构
@@ -83,11 +136,11 @@ func (t *Controller) GetDevice(ctx context.Context) (*adb.Device, error) {
 }
 
 // GetClickables 获取可点击的 UI 元素
-type GetClickablesElementsParams struct {
+type GetClickableElementsParams struct {
 	Serial string `json:"serial"`
 }
 
-func (t *Controller) GetClickables(ctx context.Context, params GetClickablesElementsParams) ([]UIElement, error) {
+func (t *Controller) GetClickableElements(ctx context.Context, params GetClickableElementsParams) ([]UIElement, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
 		return nil, err
@@ -202,23 +255,27 @@ func (t *Controller) filterUIElements(elements []UIElement) []UIElement {
 }
 
 // TapByIndex 通过索引点击元素
-func (t *Controller) TapByIndex(ctx context.Context, index int, serial string) error {
+type TapByIndexParams struct {
+	Index int `json:"index"`
+}
+
+func (t *Controller) TapByIndex(ctx context.Context, params TapByIndexParams) (*ActionResult, error) {
 	if len(t.ClickableElements) == 0 {
-		return fmt.Errorf("没有可用的可点击元素")
+		return &ActionResult{Success: false, Message: "没有可用的可点击元素"}, fmt.Errorf("没有可用的可点击元素")
 	}
 
-	element := t.findElementByIndex(t.ClickableElements, index)
+	element := t.findElementByIndex(t.ClickableElements, params.Index)
 	if element == nil {
-		return fmt.Errorf("索引 %d 处没有找到元素", index)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("索引 %d 处没有找到元素", params.Index)}, fmt.Errorf("索引 %d 处没有找到元素", params.Index)
 	}
 
 	// 解析边界并计算中心点
 	x, y, err := t.parseBounds(element.Bounds)
 	if err != nil {
-		return fmt.Errorf("解析元素边界失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("解析元素边界失败: %w", err)}, fmt.Errorf("解析元素边界失败: %w", err)
 	}
 
-	return t.TapByCoordinates(ctx, x, y)
+	return t.TapByCoordinates(ctx, TapByCoordinatesParams{X: x, Y: y})
 }
 
 // findElementByIndex 通过索引查找元素
@@ -239,98 +296,153 @@ func (t *Controller) findElementByIndex(elements []UIElement, targetIndex int) *
 // parseBounds 解析边界字符串并返回中心坐标
 func (t *Controller) parseBounds(bounds string) (int, int, error) {
 	// 解析格式: "[x1,y1][x2,y2]"
-	re := regexp.MustCompile(`\[(\d+),(\d+)\]\[(\d+),(\d+)\]`)
-	matches := re.FindStringSubmatch(bounds)
-	if len(matches) != 5 {
-		return 0, 0, fmt.Errorf("无效的边界格式: %s", bounds)
-	}
+	// re := regexp.MustCompile(`\[(\d+),(\d+)\]\[(\d+),(\d+)\]`)
+	// matches := re.FindStringSubmatch(bounds)
+	// if len(matches) != 5 {
+	// 	return 0, 0, fmt.Errorf("无效的边界格式: %s", bounds)
+	// }
+	matches := strings.Split(bounds, ",")
+	left, _ := parseInt(matches[0])
+	top, _ := parseInt(matches[1])
+	right, _ := parseInt(matches[2])
+	bottom, _ := parseInt(matches[3])
 
-	x1, _ := parseInt(matches[1])
-	y1, _ := parseInt(matches[2])
-	x2, _ := parseInt(matches[3])
-	y2, _ := parseInt(matches[4])
-
-	centerX := (x1 + x2) / 2
-	centerY := (y1 + y2) / 2
+	centerX := (left + right) / 2
+	centerY := (top + bottom) / 2
 
 	return centerX, centerY, nil
 }
 
 // TapByCoordinates 通过坐标点击
-func (t *Controller) TapByCoordinates(ctx context.Context, x, y int) error {
-	device, err := t.GetDevice(ctx)
-	if err != nil {
-		return err
-	}
-
-	return device.Tap(ctx, x, y)
+type TapByCoordinatesParams struct {
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
-// Tap 点击（通过索引）
-func (t *Controller) Tap(ctx context.Context, index int) error {
-	return t.TapByIndex(ctx, index, t.Serial)
+func (t *Controller) TapByCoordinates(ctx context.Context, params TapByCoordinatesParams) (*ActionResult, error) {
+	device, err := t.GetDevice(ctx)
+	if err != nil {
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+	}
+
+	if err := device.Tap(ctx, params.X, params.Y); err != nil {
+		return &ActionResult{Success: false, Message: fmt.Sprintf("点击失败: %w", err)}, fmt.Errorf("点击失败: %w", err)
+	}
+
+	return &ActionResult{Success: true, Message: "点击成功"}, nil
 }
 
 // Swipe 滑动手势
-func (t *Controller) Swipe(ctx context.Context, startX, startY, endX, endY, durationMs int) error {
+type SwipeParams struct {
+	StartX     int `json:"start_x"`
+	StartY     int `json:"start_y"`
+	EndX       int `json:"end_x"`
+	EndY       int `json:"end_y"`
+	DurationMs int `json:"duration_ms"`
+}
+
+func (t *Controller) Swipe(ctx context.Context, params SwipeParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return err
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
-	return device.Swipe(ctx, startX, startY, endX, endY, durationMs)
+	if err := device.Swipe(ctx, params.StartX, params.StartY, params.EndX, params.EndY, params.DurationMs); err != nil {
+		return &ActionResult{Success: false, Message: fmt.Sprintf("滑动失败: %w", err)}, fmt.Errorf("滑动失败: %w", err)
+	}
+
+	return &ActionResult{Success: true, Message: "滑动成功"}, nil
 }
 
 // InputText 输入文本
-func (t *Controller) InputText(ctx context.Context, text string, serial string) error {
+type InputTextParams struct {
+	Text string `json:"text"`
+}
+
+func (t *Controller) InputText(ctx context.Context, params InputTextParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return err
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
-	return device.InputText(ctx, text)
+	if err := device.InputText(ctx, params.Text); err != nil {
+		return &ActionResult{Success: false, Message: fmt.Sprintf("输入失败: %w", err)}, fmt.Errorf("输入失败: %w", err)
+	}
+
+	return &ActionResult{Success: true, Message: "输入成功"}, nil
 }
 
 // PressKey 按键
-func (t *Controller) PressKey(ctx context.Context, keycode int) error {
+type PressKeyParams struct {
+	Keycode int `json:"keycode"`
+}
+
+func (t *Controller) PressKey(ctx context.Context, params PressKeyParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return err
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
-	return device.PressKey(ctx, keycode)
+	if err := device.PressKey(ctx, params.Keycode); err != nil {
+		return &ActionResult{Success: false, Message: fmt.Sprintf("按键失败: %w", err)}, fmt.Errorf("按键失败: %w", err)
+	}
+
+	return &ActionResult{Success: true, Message: "按键成功"}, nil
 }
 
 // StartApp 启动应用
-func (t *Controller) StartApp(ctx context.Context, pkg, activity string) error {
+type StartAppParams struct {
+	Pkg      string `json:"pkg"`
+	Activity string `json:"activity"`
+}
+
+func (t *Controller) StartApp(ctx context.Context, params StartAppParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return err
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
-	return device.StartApp(ctx, pkg, activity)
+	if err := device.StartApp(ctx, params.Pkg, params.Activity); err != nil {
+		return &ActionResult{Success: false, Message: fmt.Sprintf("启动应用失败: %w", err)}, fmt.Errorf("启动应用失败: %w", err)
+	}
+
+	return &ActionResult{Success: true, Message: "启动应用成功"}, nil
 }
 
 // InstallApp 安装应用
-func (t *Controller) InstallApp(ctx context.Context, apkPath string, reinstall, grantPermissions bool) error {
+type InstallAppParams struct {
+	ApkPath          string `json:"apk_path"`
+	Reinstall        bool   `json:"reinstall"`
+	GrantPermissions bool   `json:"grant_permissions"`
+}
+
+func (t *Controller) InstallApp(ctx context.Context, params InstallAppParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return err
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
-	return device.InstallApp(ctx, apkPath, reinstall, grantPermissions)
+	if err := device.InstallApp(ctx, params.ApkPath, params.Reinstall, params.GrantPermissions); err != nil {
+		return &ActionResult{Success: false, Message: fmt.Sprintf("安装应用失败: %w", err)}, fmt.Errorf("安装应用失败: %w", err)
+	}
+
+	return &ActionResult{Success: true, Message: "安装应用成功"}, nil
 }
 
 // TakeScreenshot 截屏
-func (t *Controller) TakeScreenshot(ctx context.Context) (bool, error) {
+type TakeScreenshotParams struct {
+	Quality int `json:"quality"`
+}
+
+func (t *Controller) TakeScreenshot(ctx context.Context, params TakeScreenshotParams) (string, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return false, err
+		return "", fmt.Errorf("获取设备失败: %w", err)
 	}
 
-	localPath, _, err := device.TakeScreenshot(ctx, 75)
+	localPath, _, err := device.TakeScreenshot(ctx, params.Quality)
 	if err != nil {
-		return false, err
+		return "", fmt.Errorf("截屏失败: %w", err)
 	}
 
 	t.LastScreenshot = localPath
@@ -339,17 +451,21 @@ func (t *Controller) TakeScreenshot(ctx context.Context) (bool, error) {
 		Timestamp: time.Now(),
 	})
 
-	return true, nil
+	return localPath, nil
 }
 
 // ListPackages 列出包
-func (t *Controller) ListPackages(ctx context.Context, includeSystemApps bool) ([]string, error) {
+type ListPackagesParams struct {
+	IncludeSystemApps bool `json:"include_system_apps"`
+}
+
+func (t *Controller) ListPackages(ctx context.Context, params ListPackagesParams) ([]string, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	packages, err := device.ListPackages(ctx, includeSystemApps)
+	packages, err := device.ListPackages(ctx, params.IncludeSystemApps)
 	if err != nil {
 		return nil, err
 	}
@@ -363,14 +479,24 @@ func (t *Controller) ListPackages(ctx context.Context, includeSystemApps bool) (
 }
 
 // Complete 完成任务
-func (t *Controller) Complete(success bool, reason string) {
-	t.Success = success
-	t.Reason = reason
+type CompleteParams struct {
+	Success bool   `json:"success"`
+	Reason  string `json:"reason"`
+}
+
+func (t *Controller) Complete(ctx context.Context, params CompleteParams) (*ActionResult, error) {
+	t.Success = params.Success
+	t.Reason = params.Reason
 	t.Finished = true
+	return &ActionResult{Success: true, Message: "完成任务"}, nil
 }
 
 // GetPhoneState 获取手机状态
-func (t *Controller) GetPhoneState(ctx context.Context, serial string) (*PhoneState, error) {
+type GetPhoneStateParams struct {
+	Serial string `json:"serial"`
+}
+
+func (t *Controller) GetPhoneState(ctx context.Context, params GetPhoneStateParams) (*PhoneState, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
 		return nil, err
