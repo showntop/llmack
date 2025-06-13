@@ -1,4 +1,4 @@
-package claude
+package anthropic
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 )
 
 // Name ...
-var Name = "claude"
+var Name = "anthropic"
 
 func init() {
 	llm.Register(Name, NewLLM())

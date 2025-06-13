@@ -16,20 +16,20 @@ import (
 	"github.com/showntop/llmack/program"
 	"github.com/showntop/llmack/storage"
 	"github.com/showntop/llmack/tool"
-	mobileUseTool "github.com/showntop/llmack/tool/mobile"
+	"github.com/showntop/llmack/tool/adb"
 )
 
 type MobileAgent struct {
 	Agent
 	// controller *controller.Controller
-	mobile *mobileUseTool.Mobile
+	mobile *adb.Controller
 }
 
 // NewMobileAgent ...
 func NewMobileAgent(name string, options ...Option) *MobileAgent {
 	agent := &MobileAgent{
-		Agent:  *NewAgent(name, options...),
-		mobile: mobileUseTool.NewMobile(),
+		Agent: *NewAgent(name, options...),
+		// mobile: adb.NewController(""),
 	}
 	for _, option := range options { // TODO: 避免重新赋值
 		option(agent)
@@ -106,7 +106,7 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 		tools = append(tools, tool)
 	}
 	// tools = append(tools, agent.execActionTool(ctx, actionModel))
-	mobileToolName := agent.mobile.Tools()
+	mobileToolName := adb.NewTools("xxx")
 	tools = append(tools, mobileToolName, agent.getLayoutAndCoordinates())
 	// tools = append(tools, agent.getMobileState())
 
@@ -163,8 +163,8 @@ func (agent *MobileAgent) getInitialMessages(ctx context.Context, task string) [
 
 	// messages = append(messages, llm.NewAssistantMessage("nothing"))
 	// messages = append(messages, llm.NewUserTextMessage("Example output: "))
-	args := mobileUseTool.ToolParams{
-		Thought: &mobileUseTool.AgentThought{
+	args := adbTool.ToolParams{
+		Thought: &adbTool.AgentThought{
 			EvaluationPreviousGoal: `Success - I successfully launched the mobile phone.`,
 			Memory:                 `I successfully launched the mobile phone.`,
 			CurrentGoal:            `screenshot the current screen.`,

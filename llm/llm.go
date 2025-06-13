@@ -71,8 +71,8 @@ func WithDefaultModel(m string) Option {
 	}
 }
 
-// SetLogger ...
-func SetLogger(l logger) Option {
+// WithLogger ...
+func WithLogger(l logger) Option {
 	return func(options *Options) {
 		options.logger = l
 	}
