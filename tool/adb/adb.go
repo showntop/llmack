@@ -4,15 +4,17 @@ type AdbTool struct {
 	controller *Controller
 }
 
-func NewTools(serial string) []string {
-	// return &Controller{
-	// 	Serial:        serial,
-	// 	DeviceManager: adb.NewManager(""),
-	// 	Memory:        make([]string, 0),
-	// 	Screenshots:   make([]ScreenshotInfo, 0),
-	// }
-	adbTool := &AdbTool{
-		controller: NewController(serial),
-	}
+func NewTools() []any {
+	return registry.AvailableTools(nil)
+}
 
+type ToolParams struct {
+	Thought *AgentThought
+	Actions []map[string]any
+}
+
+type AgentThought struct {
+	EvaluationPreviousGoal string
+	Memory                 string
+	CurrentGoal            string
 }

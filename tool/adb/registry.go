@@ -3,10 +3,13 @@ package adb
 import (
 	"context"
 	"errors"
-	"slices"
 
-	"github.com/charmbracelet/log"
+	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/tool"
+)
+
+var (
+	registry *Registry = NewRegistry()
 )
 
 // The main service class that manages action registration and execution
@@ -20,8 +23,7 @@ func NewRegistry() *Registry {
 	}
 }
 
-// Tool registers a new tool into the registry.
-// should be called after registry initialization
+// RegisterTool should be called after registry initialization
 // registry.Tool("click_element_by_index", ClickElementFunc, "click action", paramModel, domains, pageFilter)
 func RegisterTool[T, D any](
 	r *Registry,
@@ -30,33 +32,30 @@ func RegisterTool[T, D any](
 	function tool.ToolFunc[T, D],
 ) error {
 
-	tool, err := tool.NewWithToolFunc(name, description, function)
+	toolx, err := tool.NewWithToolFunc(name, description, function)
 	if err != nil {
 		return err
 	}
-	r.Tools[name] = tool
+	r.Tools[name] = toolx
+	tool.Register(toolx)
+	log.Info("注册工具", "name", name, "description", description)
 	return nil
 }
 
-// Execute a registered action
+// ExecuteTool a registered action
 // TODO(LOW): support Context
-func (r *Registry) ExecuteAction(
+func (r *Registry) ExecuteTool(
 	ctx context.Context,
-	actionName string,
+	toolName string,
 	arguments string,
 	sensitiveData map[string]string,
 ) (string, error) {
-	action, ok := r.Actions[actionName]
+	tool, ok := r.Tools[toolName]
 	if !ok {
-		return "", errors.New("action not found")
+		return "", errors.New("tool not found")
 	}
 
-	if len(sensitiveData) > 0 {
-		arguments = r.replaceSensitiveData(arguments, sensitiveData)
-		log.Debug(arguments)
-	}
-
-	result, err := action.Tool.Invoke(ctx, arguments)
+	result, err := tool.Invoke(ctx, arguments)
 	if err != nil {
 		return "", err
 	}
@@ -64,20 +63,17 @@ func (r *Registry) ExecuteAction(
 	return result, nil
 }
 
-func (r *Registry) AvailableTools(includeTools []string) map[string]*tool.Tool {
+func (r *Registry) AvailableTools(includeTools []string) []any {
 	// Create model from registered actions, used by LLM APIs that support tool calling
 
-	// Filter actions based on page if provided:
-	//   if page is None, only include actions with no filters
-	//   if page is provided, only include actions that match the page
+	// Filter tools based on includeTools if provided:
+	//   if includeTools is nil, only include tools with no filters
+	//   if includeTools is provided, only include tools that match the includeTools
 
-	availableActions := make(map[string]*Action)
-	for name, action := range r.Actions {
-		if includeActions != nil && !slices.Contains(includeActions, name) {
-			continue
-		}
-		availableActions[name] = action
+	availableTools := make([]any, 0)
+	for name := range r.Tools {
+		availableTools = append(availableTools, name)
 	}
 
-	return availableActions
+	return availableTools
 }

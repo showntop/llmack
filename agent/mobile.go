@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -22,14 +21,14 @@ import (
 type MobileAgent struct {
 	Agent
 	// controller *controller.Controller
-	mobile *adb.Controller
+	mobileController *adb.Controller
 }
 
 // NewMobileAgent ...
 func NewMobileAgent(name string, options ...Option) *MobileAgent {
 	agent := &MobileAgent{
-		Agent: *NewAgent(name, options...),
-		// mobile: adb.NewController(""),
+		Agent:            *NewAgent(name, options...),
+		mobileController: adb.NewController("emulator-5554"),
 	}
 	for _, option := range options { // TODO: 避免重新赋值
 		option(agent)
@@ -106,8 +105,8 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 		tools = append(tools, tool)
 	}
 	// tools = append(tools, agent.execActionTool(ctx, actionModel))
-	mobileToolName := adb.NewTools("xxx")
-	tools = append(tools, mobileToolName, agent.getLayoutAndCoordinates())
+	mobileToolName := adb.NewTools()
+	tools = append(tools, mobileToolName...)
 	// tools = append(tools, agent.getMobileState())
 
 	prompt := ""
@@ -122,14 +121,14 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 	prompt += androidAgentInstruction
 	predictor := program.FunCall(
 		program.WithLLMInstance(agent.llm),
-		program.WithMaxIterationNum(10),
+		program.WithMaxIterationNum(50),
 		program.WithResetMessages(func(ctx context.Context, messages []llm.Message) []llm.Message {
-			messages = append(messages, llm.NewUserMultipartMessage(
-				llm.MultipartContentImageBase64("png", agent.mobile.GetCurrentScreenshot(ctx)),
-				llm.MultipartContentText(fmt.Sprintf(`{
-					"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
-				}`, 1080, 1920)),
-			))
+			// messages = append(messages, llm.NewUserMultipartMessage(
+			// 	// llm.MultipartContentImageBase64("png", agent.mobile.GetCurrentScreenshot(ctx)),
+			// 	llm.MultipartContentText(fmt.Sprintf(`{
+			// 		"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
+			// 	}`, 1080, 2400)),
+			// ))
 			return messages
 		}),
 	).WithInstruction(prompt).
@@ -163,46 +162,46 @@ func (agent *MobileAgent) getInitialMessages(ctx context.Context, task string) [
 
 	// messages = append(messages, llm.NewAssistantMessage("nothing"))
 	// messages = append(messages, llm.NewUserTextMessage("Example output: "))
-	args := adbTool.ToolParams{
-		Thought: &adbTool.AgentThought{
-			EvaluationPreviousGoal: `Success - I successfully launched the mobile phone.`,
-			Memory:                 `I successfully launched the mobile phone.`,
-			CurrentGoal:            `screenshot the current screen.`,
-		},
-		Actions: []map[string]any{
-			{
-				"name": "launch_mobile",
-			},
-		},
-	}
-	argsBytes, err := json.Marshal(args)
-	if err != nil {
-		panic(err)
-	}
-	exampleToolCallMessage := llm.NewAssistantMessage("I should first launch the mobile phone").WithToolCalls([]*llm.ToolCall{
-		{
-			ID:       "0001",
-			Type:     "function",
-			Function: llm.ToolCallFunction{Name: "MobileUse", Arguments: string(argsBytes)},
-		},
-	})
-	messages = append(messages, exampleToolCallMessage)
+	// args := adb.ToolParams{
+	// 	Thought: &adb.AgentThought{
+	// 		EvaluationPreviousGoal: `Success - I successfully launched the mobile phone.`,
+	// 		Memory:                 `I successfully launched the mobile phone.`,
+	// 		CurrentGoal:            `screenshot the current screen.`,
+	// 	},
+	// 	Actions: []map[string]any{
+	// 		{
+	// 			"name": "launch_mobile",
+	// 		},
+	// 	},
+	// }
+	// argsBytes, err := json.Marshal(args)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// exampleToolCallMessage := llm.NewAssistantMessage("I should first launch the mobile phone").WithToolCalls([]*llm.ToolCall{
+	// 	{
+	// 		ID:       "0001",
+	// 		Type:     "function",
+	// 		Function: llm.ToolCallFunction{Name: "MobileUse", Arguments: string(argsBytes)},
+	// 	},
+	// })
+	// messages = append(messages, exampleToolCallMessage)
 
-	messages = append(messages, llm.NewToolMessage(`I successfully launched the mobile phone.`, "0001"))
+	// messages = append(messages, llm.NewToolMessage(`I successfully launched the mobile phone.`, "0001"))
 	// messages = append(messages, llm.NewToolMessage(fmt.Sprintf(`{
 	// 	"message": "I successfully launched the mobile phone.",
 	// 	"current_state": %q,
 	// 	"next_goal": %q
 	// }`, agent.mobile.GetCurrentState(ctx), task), "0001"))
-	messages = append(messages, llm.NewUserMultipartMessage(
-		llm.MultipartContentImageBase64("png", agent.mobile.GetCurrentScreenshot(ctx)),
-		// llm.MultipartContentCustom("png", agent.mobile.GetCurrentScreenshot(ctx)),
-		llm.MultipartContentText(fmt.Sprintf(`{
-			"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
-		}`, 1080, 1920)),
-		// llm.MultipartContentText(fmt.Sprintf(`the current active element: \n %s`,
-		// 	agent.mobile.GetCurrentClickableElements(ctx))),
-	))
+	// messages = append(messages, llm.NewUserMultipartMessage(
+	// 	// llm.MultipartContentImageBase64("png", agent.mobile.GetCurrentScreenshot(ctx)),
+	// 	// llm.MultipartContentCustom("png", agent.mobile.GetCurrentScreenshot(ctx)),
+	// 	llm.MultipartContentText(fmt.Sprintf(`{
+	// 		"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
+	// 	}`, 1080, 2400)),
+	// 	// llm.MultipartContentText(fmt.Sprintf(`the current active element: \n %s`,
+	// 	// 	agent.mobile.GetCurrentClickableElements(ctx))),
+	// ))
 
 	// messages = append(messages, llm.NewUserTextMessage("[Your task history memory starts here]"))
 	return messages
@@ -211,26 +210,29 @@ func (agent *MobileAgent) getInitialMessages(ctx context.Context, task string) [
 func (agent *MobileAgent) getLayoutAndCoordinates() string {
 	model := llm.NewInstance(doubao.Name, llm.WithDefaultModel("doubao-1-5-ui-tars-250428"))
 	function := func(ctx context.Context, args string) (string, error) {
-		screenshot := agent.mobile.GetCurrentScreenshot(ctx)
+		// screenshot := agent.mobile.GetCurrentScreenshot(ctx)
 		// TODO: get layout and coordinates
 		response, err := model.Invoke(ctx, []llm.Message{
 			llm.NewSystemMessage(`
 You are a GUI agent that can get the layout and coordinates of an element on the screenshot by the task given to you.
+You should more precisely with pixel-level analysis.
+Answer in chinese.
 			`),
 
-			llm.NewUserTextMessage(fmt.Sprintf("the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task", 1080, 1920)),
+			// llm.NewUserTextMessage(fmt.Sprintf("the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task", 1080, 2400)),
 			llm.NewUserMultipartMessage(
-				llm.MultipartContentImageBase64("png", screenshot),
+				// llm.MultipartContentImageBase64("png", screenshot),
 				llm.MultipartContentText(fmt.Sprintf(`{
 					"message": "the image given is a screenshot of the current screen with resolution %d x %d, you can use to help you complete the task",
-				}`, 1080, 1920)),
+				}`, 1080, 2400)),
 				llm.MultipartContentText(fmt.Sprintf(`Your task is: %s`, args)),
 			),
 		}, llm.WithStream(true))
 		if err != nil {
 			return "", err
 		}
-		return response.Result().Message.Content(), nil
+		result := response.Result()
+		return "reasoning: " + result.Message.ReasoningContent + "\n" + "answer: " + result.Message.Content(), nil
 	}
 	toolx := tool.New(
 		tool.WithName("GetLayoutAndCoordinates"),
@@ -306,30 +308,65 @@ func (agent *MobileAgent) fetchOrCreateSession(ctx context.Context, sessionID st
 
 var (
 	androidAgentInstruction = `
-1. Your goal is to accomplish the ultimate task using the mobile device with the following actions:
-- You can use the mobile device to take screenshot.
-- You can use the mobile device to tap on elements.
-- You can use the mobile device to input text.
-- You can use the mobile device's browser to go to a url.
+# Response Rules
 
-<tool_rules>
-1. You can use the following tools to complete the task:
-- GetLayoutAndCoordinates
-- MobileUse
-2. When you need the layout and coordinates of an element from a screenshot, you must use the GetLayoutAndCoordinates tool.
-</tool_rules>
+1. RESPONSE FORMAT: You must ALWAYS respond with valid JSON in this exact format:
+   {"thought": {"evaluation_previous_goal": "Success|Failed|Unknown - Analyze the current elements and the image to check if the previous goals/actions are successful like intended by the task. Mention if something unexpected happened. Shortly state why/why not",
+   "memory": "Description of what has been done and what you need to remember. Be very specific. Count here ALWAYS how many times you have done something and how many remain. E.g. 0 out of 10 websites analyzed. Continue with abc and xyz",
+   "next_goal": "What needs to be done with the next immediate action"},
+   "actions":[{"one_action_name": {// action-specific parameter}}, // ... more actions in sequence]}
 
-<action_rules>
-1. You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. 
-2. Common action sequences:
-	- Take screenshot: [{\"take_screenshot\": {}}]
-	- Tap on element: [{\"tap_by_coordinates\": {\"x\": 100, \"y\": 100, \"duration\": 100}}]
-3. Actions are executed in the given order
-4. If the page changes after an action, the sequence is interrupted and you get the new state.
-5. Only provide the action sequence until an action which changes the page state significantly.
-6. Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
-7. only use multiple actions if it makes sense.
-8. Only use indexes of the interactive elements
-</action_rules>
+2. ACTIONS: You can specify multiple actions in the list to be executed in sequence. But always specify only one action name per item. Use maximum {max_actions} actions per sequence.
+Common action sequences:
+
+- Form filling: [{"input_text": {"index": 1, "text": "username"}}, {"input_text": {"index": 2, "text": "password"}}, {"click_element_by_index": {"index": 3}}]
+- Navigation and extraction: [{"go_to_url": {"url": "https://example.com"}}, {"extract_content": {"goal": "extract the names"}}]
+- Actions are executed in the given order
+- If the page changes after an action, the sequence is interrupted and you get the new state.
+- Only provide the action sequence until an action which changes the page state significantly.
+- Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page
+- only use multiple actions if it makes sense.
+
+3. ELEMENT INTERACTION:
+
+- Only use indexes of the interactive elements
+
+4. NAVIGATION & ERROR HANDLING:
+
+- If no suitable elements exist, use other functions to complete the task
+- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- Handle popups/cookies by accepting or closing them
+- Use scroll to find elements you are looking for
+- If you want to research something, open a new tab instead of using the current tab
+- If captcha pops up, try to solve it - else try a different approach
+- If the page is not fully loaded, use wait action
+
+5. TASK COMPLETION:
+
+- Use the done action as the last action as soon as the ultimate task is complete
+- Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps.
+- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completely finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
+- Don't hallucinate actions
+- Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task.
+
+6. VISUAL CONTEXT:
+
+- When an image is provided, use it to understand the page layout
+- Bounding boxes with labels on their top right corner correspond to element indexes
+
+7. Form filling:
+
+- If you fill an input field and your action sequence is interrupted, most often something changed e.g. suggestions popped up under the field.
+
+8. Long tasks:
+
+- Keep track of the status and subresults in the memory.
+- You are provided with procedural memory summaries that condense previous task history (every N steps). Use these summaries to maintain context about completed actions, current progress, and next steps. The summaries appear in chronological order and contain key information about navigation history, findings, errors encountered, and current state. Refer to these summaries to avoid repeating actions and to ensure consistent progress toward the task goal.
+
+9. Extraction:
+
+- If your task is to find information - call extract_content on the specific pages to get and store the information.
+  Your responses must be always JSON with the specified format.
 	`
 )
