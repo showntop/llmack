@@ -46,6 +46,14 @@ func init() {
 	// })
 }
 
+// initAndroid 初始化安卓手机
+func initAndroid() {
+	// adb install droidrun-portable.apk
+	// adb install ADBKeyboard.apk
+	// adb shell ime enable com.android.adbkeyboard/.AdbIME
+	// adb shell ime set com.android.adbkeyboard/.AdbIME
+}
+
 func main() {
 
 	androidAgent := agent.NewMobileAgent("mobile use agent",
@@ -55,7 +63,8 @@ func main() {
 		// agent.WithModel(llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))),
 	)
 
-	response := androidAgent.Invoke(context.Background(), "打开抖音搜集本地生活的商家信息", agent.WithMaxIterationNum(10))
+	// response := androidAgent.Invoke(context.Background(), "打开抖音搜集本地生活的商家信息", agent.WithMaxIterationNum(10))
+	response := androidAgent.Invoke(context.Background(), "在搜索框输入：抖音", agent.WithMaxIterationNum(10))
 	if response.Error != nil {
 		panic(response.Error)
 	}

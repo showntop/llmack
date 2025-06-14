@@ -2,6 +2,7 @@ package adb
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,10 +95,48 @@ func (d *Device) Swipe(ctx context.Context, startX, startY, endX, endY, duration
 // InputText 输入文本
 func (d *Device) InputText(ctx context.Context, text string) error {
 	// 对文本进行转义处理
-	escapedText := strings.ReplaceAll(text, " ", "%s")
-	cmd := fmt.Sprintf("input text %s", escapedText)
-	_, err := d.Wrapper.Shell(ctx, d.Serial, cmd)
-	return err
+	// escapedText := strings.ReplaceAll(text, " ", "%s")
+	// cmd := fmt.Sprintf("input text %s", escapedText)
+	// _, err := d.Wrapper.Shell(ctx, d.Serial, cmd)
+	// return err
+
+	// Save the current keyboard
+	originalKeyboard, err := d.Wrapper.Shell(ctx, d.Serial, "settings get secure default_input_method")
+	if err != nil {
+		return err
+	}
+	originalKeyboard = strings.TrimSpace(originalKeyboard)
+	fmt.Println("current keyboard: ", originalKeyboard)
+
+	// Enable the Droidrun keyboard
+	d.Wrapper.Shell(ctx, d.Serial, "ime enable com.droidrun.portal/.DroidrunKeyboardIME")
+	// Set the Droidrun keyboard as the default
+	d.Wrapper.Shell(ctx, d.Serial, "ime set com.droidrun.portal/.DroidrunKeyboardIME")
+
+	// Wait for keyboard to change
+	time.Sleep(200 * time.Millisecond)
+
+	// Encode the text to Base64
+	encodedText := base64.StdEncoding.EncodeToString([]byte(text))
+	cmd := fmt.Sprintf("am broadcast -a com.droidrun.portal.DROIDRUN_INPUT_B64 --es msg %s -p com.droidrun.portal", encodedText)
+	_, err = d.Wrapper.Shell(ctx, d.Serial, cmd)
+	if err != nil {
+		return err
+	}
+
+	// Wait for text input to complete
+	time.Sleep(500 * time.Millisecond)
+
+	// Restore the original keyboard
+	if !strings.Contains(originalKeyboard, "com.droidrun.portal") {
+		cmd = fmt.Sprintf("ime set %s", originalKeyboard)
+		_, err = d.Wrapper.Shell(ctx, d.Serial, cmd)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // PressKey 按键

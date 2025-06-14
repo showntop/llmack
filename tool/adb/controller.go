@@ -44,10 +44,10 @@ func NewController(serial string) *Controller {
 		if err != nil {
 			panic(err)
 		}
-		// err = RegisterTool(registry, "tap_by_coordinates", "通过坐标点击元素", ctrl.TapByCoordinates)
-		// if err != nil {
-		// 	panic(err)
-		// }
+		err = RegisterTool(registry, "tap_by_coordinates", "通过坐标点击元素", ctrl.TapByCoordinates)
+		if err != nil {
+			panic(err)
+		}
 		err = RegisterTool(registry, "swipe", "滑动", ctrl.Swipe)
 		if err != nil {
 			panic(err)
@@ -256,7 +256,7 @@ func (t *Controller) filterUIElements(elements []UIElement) []UIElement {
 
 // TapByIndex 通过索引点击元素
 type TapByIndexParams struct {
-	Index int `json:"index"`
+	Index int `json:"index" jsonschema:"description=元素索引(来源于clickable elements中元素的index字段值)"`
 }
 
 func (t *Controller) TapByIndex(ctx context.Context, params TapByIndexParams) (*ActionResult, error) {
@@ -374,7 +374,7 @@ func (t *Controller) InputText(ctx context.Context, params InputTextParams) (*Ac
 
 // PressKey 按键
 type PressKeyParams struct {
-	Keycode int `json:"keycode"`
+	Keycode int `json:"keycode" jsonschema:"enum=3,enum=4,enum=24,enum=25,enum=26,enum=82,description=按键码（通用码：\n- 3: HOME\n- 4: BACK\n- 24: VOLUME UP\n- 25: VOLUME DOWN\n- 26: POWER\n- 82: MENU）,required"`
 }
 
 func (t *Controller) PressKey(ctx context.Context, params PressKeyParams) (*ActionResult, error) {

@@ -38,7 +38,7 @@ func (t *AdbTool) GetMobileCurrentScreenshot(ctx context.Context) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Println("screenshot path: ", localPath)
 	return os.ReadFile(localPath)
 }
 
@@ -176,8 +176,9 @@ Common action sequences:
 - only use multiple actions if it makes sense.
 
 3. ELEMENT INTERACTION:
-- Use GetClickableElements to get clickable elements
 - Only use indexes of the interactive elements
+- You should always use tap_by_index to click an element, except you are sure the element is not in the clickable elements list and you can use tap_by_coordinates to click it.
+- When use tap_by_index, make sure the index is the index field of the element in the clickable elements list
 
 4. NAVIGATION & ERROR HANDLING:
 - If no suitable elements exist, use other functions to complete the task

@@ -11,7 +11,7 @@ import (
 	"github.com/showntop/llmack/tool"
 )
 
-var MaxIterationNum = 20
+var MaxIterationNum = 2000
 
 // FunCall ...
 func FunCall(opts ...option) *predictor {

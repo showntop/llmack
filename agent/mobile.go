@@ -125,34 +125,69 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 	prompt += androidAgentInstruction
 	predictor := program.FunCall(
 		program.WithLLMInstance(agent.llm),
-		program.WithMaxIterationNum(50),
+		program.WithMaxIterationNum(500),
 		program.WithResetMessages(func(ctx context.Context, messages []llm.Message) []llm.Message {
+			newMessages := []llm.Message{}
+			if len(messages) > 15 { // 轮次过多，summary
+				// 重新组织 messags, 删除过早的 assistant 和 tool 的消息
+				newMessages = append(newMessages, messages[0]) // system message
+				newMessages = append(newMessages, messages[1]) // user message
+
+				// dialog summary
+				detail := ""
+				for i := 2; i < len(messages)-2; i++ {
+					if messages[i].Role() == llm.MessageRoleAssistant {
+						detail += "assistant: " + messages[i].Content() + "\n"
+					}
+					if messages[i].Role() == llm.MessageRoleTool {
+						detail += "tool: " + messages[i].Content() + "\n"
+					}
+				}
+				// 总结对话
+				// response, err := agent.llm.Invoke(ctx, []llm.Message{
+				// 	llm.NewSystemMessage(`
+				// 	You are a helpful assistant that can summarize the dialog messages.
+				// 	`),
+				// 	llm.NewUserTextMessage(fmt.Sprintf(`the dialog detail: \n %s`, detail)),
+				// })
+				// if err != nil {
+				// 	return messages
+				// }
+				// summary := response.Result().Message.Content()
+				// newMessages = append(newMessages, llm.NewUserTextMessage(fmt.Sprintf(`execute proceed summary: \n %s`, summary)))
+				newMessages = append(newMessages, messages[len(messages)-2])
+				newMessages = append(newMessages, messages[len(messages)-1])
+			} else {
+				newMessages = messages
+			}
+
 			screenshot, err := agent.adbTool.GetMobileCurrentScreenshot(ctx)
 			if err != nil {
-				return messages
+				return newMessages
 			}
 			elements, err := agent.adbTool.GetMobileCurrentClickableElements(ctx)
 			if err != nil {
-				return messages
+				return newMessages
 			}
 			elementsJSON, err := json.Marshal(elements)
 			if err != nil {
-				return messages
+				return newMessages
 			}
 			state, err := agent.adbTool.GetMobileCurrentPhoneState(ctx)
 			if err != nil {
-				return messages
+				return newMessages
 			}
 			stateJSON, err := json.Marshal(state)
 			if err != nil {
-				return messages
+				return newMessages
 			}
-			messages = append(messages, llm.NewUserMultipartMessage(
+			newMessages = append(newMessages, llm.NewUserMultipartMessage(
 				llm.MultipartContentImageBase64("png", screenshot),
+				llm.MultipartContentText(fmt.Sprintf(`the current screenshot image is 720x1280, you can use it to help you complete the task`)),
 				llm.MultipartContentText(fmt.Sprintf(`the current clickable elements: \n %s`, elementsJSON)),
 				llm.MultipartContentText(fmt.Sprintf(`the current phone state: \n %s`, stateJSON)),
 			))
-			return messages
+			return newMessages
 		}),
 	).WithInstruction(prompt).
 		// WithInputs(input).
