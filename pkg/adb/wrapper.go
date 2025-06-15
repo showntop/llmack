@@ -52,7 +52,6 @@ func (w *Wrapper) GetDevices(ctx context.Context) ([]DeviceInfo, error) {
 
 // Shell 在设备上执行 shell 命令
 func (w *Wrapper) Shell(ctx context.Context, serial, command string) (string, error) {
-	fmt.Println("execute shell command: ", w.adbPath, " -s ", serial, " shell ", command)
 	cmd := exec.CommandContext(ctx, w.adbPath, "-s", serial, "shell", command)
 	output, err := cmd.Output()
 	if err != nil {

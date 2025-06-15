@@ -155,6 +155,10 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 				// }
 				// summary := response.Result().Message.Content()
 				// newMessages = append(newMessages, llm.NewUserTextMessage(fmt.Sprintf(`execute proceed summary: \n %s`, summary)))
+				newMessages = append(newMessages, messages[len(messages)-6])
+				newMessages = append(newMessages, messages[len(messages)-5])
+				newMessages = append(newMessages, messages[len(messages)-4])
+				newMessages = append(newMessages, messages[len(messages)-3])
 				newMessages = append(newMessages, messages[len(messages)-2])
 				newMessages = append(newMessages, messages[len(messages)-1])
 			} else {
@@ -163,23 +167,28 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 
 			screenshot, err := agent.adbTool.GetMobileCurrentScreenshot(ctx)
 			if err != nil {
-				return newMessages
+				log.ErrorContextf(ctx, "get mobile current screenshot error: %v", err)
+				// return newMessages
 			}
 			elements, err := agent.adbTool.GetMobileCurrentClickableElements(ctx)
 			if err != nil {
-				return newMessages
+				log.ErrorContextf(ctx, "get mobile current clickable elements error: %v", err)
+				// return newMessages
 			}
 			elementsJSON, err := json.Marshal(elements)
 			if err != nil {
-				return newMessages
+				log.ErrorContextf(ctx, "marshal mobile current clickable elements error: %v", err)
+				// return newMessages
 			}
 			state, err := agent.adbTool.GetMobileCurrentPhoneState(ctx)
 			if err != nil {
-				return newMessages
+				log.ErrorContextf(ctx, "get mobile current phone state error: %v", err)
+				// return newMessages
 			}
 			stateJSON, err := json.Marshal(state)
 			if err != nil {
-				return newMessages
+				log.ErrorContextf(ctx, "marshal mobile current phone state error: %v", err)
+				// return newMessages
 			}
 			newMessages = append(newMessages, llm.NewUserMultipartMessage(
 				llm.MultipartContentImageBase64("png", screenshot),
