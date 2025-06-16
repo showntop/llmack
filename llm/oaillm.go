@@ -29,6 +29,14 @@ func NewOAILLM(url, apiKey string) *OAILLM {
 	}
 }
 
+func NewOAILLMWithClient(url, apiKey string, client *http.Client) *OAILLM {
+	return &OAILLM{
+		baseURL: url,
+		apiKey:  apiKey,
+		client:  client,
+	}
+}
+
 func (o *OAILLM) Invoke(ctx context.Context, messages []Message, options *InvokeOptions) (*Response, error) {
 	// validate
 	if options.Model == "" {

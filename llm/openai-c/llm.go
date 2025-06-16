@@ -12,7 +12,7 @@ import (
 var Name = "openai-c"
 
 func init() {
-	llm.Register(Name, NewLLM())
+	llm.Register(Name, func(o *llm.ProviderOptions) llm.Provider { return &LLM{} })
 }
 
 // LLM ...

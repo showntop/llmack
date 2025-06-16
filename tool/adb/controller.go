@@ -272,7 +272,7 @@ func (t *Controller) TapByIndex(ctx context.Context, params TapByIndexParams) (*
 	// 解析边界并计算中心点
 	x, y, err := t.parseBounds(element.Bounds)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("解析元素边界失败: %w", err)}, fmt.Errorf("解析元素边界失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("解析元素边界失败: %v", err)}, fmt.Errorf("解析元素边界失败: %v", err)
 	}
 
 	return t.TapByCoordinates(ctx, TapByCoordinatesParams{X: x, Y: y})
@@ -322,11 +322,11 @@ type TapByCoordinatesParams struct {
 func (t *Controller) TapByCoordinates(ctx context.Context, params TapByCoordinatesParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %v", err)
 	}
 
 	if err := device.Tap(ctx, params.X, params.Y); err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("点击失败: %w", err)}, fmt.Errorf("点击失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("点击失败: %v", err)}, fmt.Errorf("点击失败: %v", err)
 	}
 
 	return &ActionResult{Success: true, Message: "点击成功"}, nil
