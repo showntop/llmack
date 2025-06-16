@@ -16,7 +16,7 @@ const (
 )
 
 func init() {
-	llm.Register(Name, &LLM{name: Name})
+	llm.Register(Name, func() llm.Provider { return &LLM{} })
 }
 
 // LLM ...

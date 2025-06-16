@@ -24,10 +24,12 @@ type Instance struct {
 	opts     *Options
 }
 
-var providers = map[string]Provider{}
+type ProviderConstructor func() Provider
+
+var providers = map[string]ProviderConstructor{}
 
 // Register ...
-func Register(name string, provider Provider) {
+func Register(name string, provider ProviderConstructor) {
 	providers[name] = provider
 }
 
@@ -90,7 +92,7 @@ func NewInstance(provider string, opts ...Option) *Instance {
 	return &Instance{
 		name:     provider,
 		opts:     &options,
-		provider: providers[provider],
+		provider: providers[provider](),
 	}
 }
 

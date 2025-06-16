@@ -12,7 +12,7 @@ import (
 var Name = "deepseek"
 
 func init() {
-	llm.Register(Name, NewLLM())
+	llm.Register(Name, NewLLM)
 }
 
 // LLM ...
@@ -22,7 +22,7 @@ type LLM struct {
 }
 
 // NewLLM ...
-func NewLLM() *LLM {
+func NewLLM() llm.Provider {
 	return &LLM{}
 }
 
