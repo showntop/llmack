@@ -16,7 +16,7 @@ import (
 var Name = "hunyuan"
 
 func init() {
-	llm.Register(Name, func() llm.Provider { return &LLM{} })
+	llm.Register(Name, func(o *llm.ProviderOptions) llm.Provider { return &LLM{} })
 }
 
 // LLM ...

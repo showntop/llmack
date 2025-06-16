@@ -24,7 +24,11 @@ type Instance struct {
 	opts     *Options
 }
 
-type ProviderConstructor func() Provider
+type ProviderOptions struct {
+	baseURL string
+	apiKey  string
+}
+type ProviderConstructor func(*ProviderOptions) Provider
 
 var providers = map[string]ProviderConstructor{}
 
@@ -35,10 +39,12 @@ func Register(name string, provider ProviderConstructor) {
 
 // Options ...
 type Options struct {
-	hooks  []Hook
-	cache  Cache
-	logger logger
-	model  string
+	baseURL string
+	apiKey  string
+	hooks   []Hook
+	cache   Cache
+	logger  logger
+	model   string
 	*InvokeOptions
 }
 
@@ -49,6 +55,18 @@ type Option func(*Options)
 func WithInvokeOptions(o *InvokeOptions) Option {
 	return func(options *Options) {
 		options.InvokeOptions = o
+	}
+}
+
+func WithBaseURL(baseURL string) Option {
+	return func(options *Options) {
+		options.baseURL = baseURL
+	}
+}
+
+func WithAPIKey(apiKey string) Option {
+	return func(options *Options) {
+		options.apiKey = apiKey
 	}
 }
 
@@ -88,11 +106,15 @@ func NewInstance(provider string, opts ...Option) *Instance {
 	for _, o := range opts {
 		o(&options)
 	}
+	po := &ProviderOptions{
+		baseURL: options.baseURL,
+		apiKey:  options.apiKey,
+	}
 
 	return &Instance{
 		name:     provider,
 		opts:     &options,
-		provider: providers[provider](),
+		provider: providers[provider](po),
 	}
 }
 

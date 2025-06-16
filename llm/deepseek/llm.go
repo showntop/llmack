@@ -22,7 +22,7 @@ type LLM struct {
 }
 
 // NewLLM ...
-func NewLLM() llm.Provider {
+func NewLLM(o *llm.ProviderOptions) llm.Provider {
 	return &LLM{}
 }
 

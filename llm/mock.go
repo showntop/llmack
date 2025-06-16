@@ -59,5 +59,5 @@ func (m *MockLLMModel) Name() string {
 }
 
 func init() {
-	Register(MockLLMModelName, func() Provider { return &MockLLMModel{} })
+	Register(MockLLMModelName, func(o *ProviderOptions) Provider { return &MockLLMModel{} })
 }
