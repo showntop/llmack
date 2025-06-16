@@ -28,6 +28,14 @@ func NewOAILLM(url, apiKey string) *OAILLM {
 	}
 }
 
+func NewOAILLMWithClient(url, apiKey string, client *http.Client) *OAILLM {
+	return &OAILLM{
+		baseURL: url,
+		apiKey:  apiKey,
+		client:  client,
+	}
+}
+
 func (o *OAILLM) Invoke(ctx context.Context, messages []Message, options *InvokeOptions) (*Response, error) {
 	// validate
 	if options.Model == "" {
@@ -53,8 +61,8 @@ func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest
 	if err != nil {
 		return nil, err
 	}
-	payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
-	payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
+	// payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
+	// payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
 	// payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
 
 	log.InfoContextf(ctx, "OAILLM ChatCompletions request payload %s", string(payload)) // for debug
