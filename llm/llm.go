@@ -25,8 +25,8 @@ type Instance struct {
 }
 
 type ProviderOptions struct {
-	baseURL string
-	apiKey  string
+	BaseURL string
+	ApiKey  string
 }
 type ProviderConstructor func(*ProviderOptions) Provider
 
@@ -107,8 +107,8 @@ func NewInstance(provider string, opts ...Option) *Instance {
 		o(&options)
 	}
 	po := &ProviderOptions{
-		baseURL: options.baseURL,
-		apiKey:  options.apiKey,
+		BaseURL: options.baseURL,
+		ApiKey:  options.apiKey,
 	}
 
 	return &Instance{
