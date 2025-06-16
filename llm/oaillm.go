@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -55,41 +56,54 @@ func (o *OAILLM) Invoke(ctx context.Context, messages []Message, options *Invoke
 }
 
 // ChatCompletions ...
-func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest) (io.ReadCloser, error) {
-
+func (o *OAILLM) ChatCompletions(ctx context.Context, req ChatCompletionRequest) (io.ReadCloser, error) {
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal oaillmchat completions request error %s", err)
 	}
 	// payload = bytes.Replace(payload, []byte("\\u003c"), []byte("<"), -1)
 	// payload = bytes.Replace(payload, []byte("\\u003e"), []byte(">"), -1)
 	// payload = bytes.Replace(payload, []byte("\\u0026"), []byte("&"), -1)
-
 	log.InfoContextf(ctx, "OAILLM ChatCompletions request payload %s", string(payload)) // for debug
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", o.baseURL, bytes.NewReader(payload))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oaillm chat completions new request error %s", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
 	resp, err := o.client.Do(httpReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oaillm chat completions request error %s", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
-		return nil, errors.New(resp.Status + ": " + string(raw))
+		return nil, errors.New("oaillm chat completions request statuserror " + resp.Status + ": " + string(raw))
 	}
 
 	return resp.Body, nil
 }
 
 // buildRequest ...
-func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatCompletionRequest {
-	request := &ChatCompletionRequest{}
-	request.InvokeOptions = options
+func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) ChatCompletionRequest {
+	request := ChatCompletionRequest{}
+
+	// 复制所有 options 的field 到 request
+	optionsBytes, err := json.Marshal(options)
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(optionsBytes, &request)
+	if err != nil {
+		panic(err)
+	}
+	delete(request, "metadata")
+
+	for k, v := range options.Metadata {
+		request[k] = v
+	}
 	// messages
+	chatMessages := []*ChatCompletionMessage{}
 	for _, m := range messages {
 		msg := &ChatCompletionMessage{
 			Role:       string(m.Role()),
@@ -98,13 +112,16 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 		msg.ToolCalls = m.GetToolCalls()
 		msg.Content = m.Content()
 		msg.MultipartContent = m.MultipartContent()
-		request.Messages = append(request.Messages, msg)
+		chatMessages = append(chatMessages, msg)
 	}
+	request["messages"] = chatMessages
 	if len(options.Tools) <= 0 {
 		return request
 	}
-	request.ToolChoice = "auto"
-	request.Tools = options.Tools
+	if request["tool_choice"] == nil {
+		request["tool_choice"] = "auto"
+	}
+	request["tools"] = options.Tools
 	return request
 }
 
@@ -147,7 +164,7 @@ func (o *OAILLM) handleStreamResponse(body io.ReadCloser) (*Response, error) {
 func readLine(reader *bufio.Reader) ([]byte, error) {
 
 	var (
-		headerData  = []byte("data: ")
+		headerData  = []byte("data:") // TODO FIX for some api not have space after :
 		errorPrefix = []byte(`data: {"error":`)
 	)
 
@@ -185,6 +202,7 @@ READ:
 	}
 
 	noPrefixLine := bytes.TrimPrefix(noSpaceLine, headerData)
+	noPrefixLine = bytes.TrimPrefix(noPrefixLine, []byte(" "))
 	if string(noPrefixLine) == "[DONE]" {
 		return nil, io.EOF
 	}
