@@ -108,7 +108,7 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 		return nil, err
 	}
 
-	if len(mmm.Choices) < 0 {
+	if len(mmm.Choices) <= 0 {
 		return nil, errors.New("no choices")
 	}
 	chunk := &Chunk{}
