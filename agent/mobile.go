@@ -28,7 +28,7 @@ type MobileAgent struct {
 
 // NewMobileAgent ...
 func NewMobileAgent(name string, options ...Option) *MobileAgent {
-	ctrl := adb.NewController("emulator-5554")
+	ctrl := adb.NewController("47.96.179.122:1000")
 	agent := &MobileAgent{
 		Agent:            *NewAgent(name, options...),
 		mobileController: ctrl,
