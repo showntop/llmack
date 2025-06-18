@@ -1,0 +1,28 @@
+{
+  "servers": {
+    "filesystem": {
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/tmp"
+      ],
+      "command": "npx",
+      "description": "文件系统访问服务器",
+      "enabled": true,
+      "transport": "stdio"
+    },
+    "github": {
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "command": "npx",
+      "description": "GitHub仓库访问服务器",
+      "enabled": false,
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token-here"
+      },
+      "transport": "stdio"
+    }
+  }
+}
