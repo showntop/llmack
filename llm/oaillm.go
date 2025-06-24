@@ -48,7 +48,7 @@ func (o *OAILLM) Invoke(ctx context.Context, messages []Message, options *Invoke
 }
 
 // ChatCompletions ...
-func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest) (io.ReadCloser, error) {
+func (o *OAILLM) ChatCompletions(ctx context.Context, req ChatCompletionRequest) (io.ReadCloser, error) {
 	payload, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal oaillmchat completions request error %s", err)
@@ -77,10 +77,25 @@ func (o *OAILLM) ChatCompletions(ctx context.Context, req *ChatCompletionRequest
 }
 
 // buildRequest ...
-func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatCompletionRequest {
-	request := &ChatCompletionRequest{}
-	request.InvokeOptions = options
+func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) ChatCompletionRequest {
+	request := ChatCompletionRequest{}
+
+	// 复制所有 options 的field 到 request
+	optionsBytes, err := json.Marshal(options)
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(optionsBytes, &request)
+	if err != nil {
+		panic(err)
+	}
+	delete(request, "metadata")
+
+	for k, v := range options.Metadata {
+		request[k] = v
+	}
 	// messages
+	chatMessages := []*ChatCompletionMessage{}
 	for _, m := range messages {
 		msg := &ChatCompletionMessage{
 			Role:       string(m.Role()),
@@ -89,15 +104,16 @@ func (o *OAILLM) buildRequest(messages []Message, options *InvokeOptions) *ChatC
 		msg.ToolCalls = m.GetToolCalls()
 		msg.Content = m.Content()
 		msg.MultipartContent = m.MultipartContent()
-		request.Messages = append(request.Messages, msg)
+		chatMessages = append(chatMessages, msg)
 	}
+	request["messages"] = chatMessages
 	if len(options.Tools) <= 0 {
 		return request
 	}
-	if request.ToolChoice == nil {
-		request.ToolChoice = "auto"
+	if request["tool_choice"] == nil {
+		request["tool_choice"] = "auto"
 	}
-	request.Tools = options.Tools
+	request["tools"] = options.Tools
 	return request
 }
 

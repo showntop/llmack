@@ -7,8 +7,8 @@ import (
 
 // InvokeOptions ...
 type InvokeOptions struct {
-	Stop           []string                      `json:"stop,omitempty"`
-	ResponseFormat *ChatCompletionResponseFormat `json:"response_format,omitempty"`
+	Stop []string `json:"stop,omitempty"`
+	// ResponseFormat *ChatCompletionResponseFormat `json:"response_format,omitempty"`
 	// LogitBias is must be a token id string (specified by their token ID in the tokenizer), not a word string.
 	// incorrect: `"logit_bias":{"You": 6}`, correct: `"logit_bias":{"1639": 6}`
 	// refs: https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias
@@ -68,7 +68,7 @@ type InvokeOptions struct {
 
 	// Metadata is a map of metadata to include in the request.
 	// The meaning of this field is specific to the backend in use.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 type StreamOptions struct {
@@ -144,43 +144,35 @@ const (
 // InvokeOption is a function that configures a InvokeOptions.
 type InvokeOption func(*InvokeOptions)
 
-// // WithSuperParams specifies the super params for the model.
-// func WithSuperParams(o1 *InvokeOptions) InvokeOption {
-// 	return func(o *InvokeOptions) {
-// 		o.Temperature = o1.Temperature
-// 		o.MaxTokens = o1.MaxTokens
-// 		o.TopP = o1.TopP
-// 		o.TopK = o1.TopK
-// 		o.FrequencyPenalty = o1.FrequencyPenalty
-// 		o.PresencePenalty = o1.PresencePenalty
-// 		o.RepetitionPenalty = o1.RepetitionPenalty
-// 	}
-// }
-
+// WithTemperature specifies the temperature for sampling.
 func WithTemperature(temperature float64) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.Temperature = temperature
 	}
 }
 
+// WithMaxTokens specifies the maximum number of tokens to generate.
 func WithMaxTokens(maxTokens int) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.MaxTokens = maxTokens
 	}
 }
 
+// WithTopP specifies the cumulative probability for top-p sampling.
 func WithTopP(topP float64) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.TopP = topP
 	}
 }
 
+// WithTopK specifies the number of tokens to consider for top-k sampling.
 func WithTopK(topK int) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.TopK = topK
 	}
 }
 
+// WithFrequencyPenalty specifies the frequency penalty for sampling.
 func WithFrequencyPenalty(frequencyPenalty float64) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.FrequencyPenalty = frequencyPenalty
@@ -211,5 +203,12 @@ func WithStream(stream bool) InvokeOption {
 func WithToolChoice(toolChoice any) InvokeOption {
 	return func(o *InvokeOptions) {
 		o.ToolChoice = toolChoice
+	}
+}
+
+// WithMetadata specifies the metadata for the request.
+func WithMetadata(metadata map[string]any) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.Metadata = metadata
 	}
 }

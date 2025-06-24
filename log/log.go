@@ -92,5 +92,5 @@ func DebugContextf(ctx context.Context, format string, args ...interface{}) {
 
 // Info ...
 func Info(format string, args ...interface{}) {
-	defaultLogger.DebugContextf(context.TODO(), format, args...)
+	defaultLogger.InfoContextf(context.TODO(), format, args...)
 }

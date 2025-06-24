@@ -35,10 +35,11 @@ func NewController(serial string) *Controller {
 	}
 
 	if registry != nil {
-		err := RegisterTool(registry, "get_clickable_elements", "获取可点击的 UI 元素", ctrl.GetClickableElements)
-		if err != nil {
-			panic(err)
-		}
+		var err error
+		// err := RegisterTool(registry, "get_clickable_elements", "获取可点击的 UI 元素", ctrl.GetClickableElements)
+		// if err != nil {
+		// 	panic(err)
+		// }
 		err = RegisterTool(registry, "tap_by_index", "通过元素索引点击元素", ctrl.TapByIndex)
 		if err != nil {
 			panic(err)
@@ -67,22 +68,23 @@ func NewController(serial string) *Controller {
 		if err != nil {
 			panic(err)
 		}
-		err = RegisterTool(registry, "take_screenshot", "截屏", ctrl.TakeScreenshot)
-		if err != nil {
-			panic(err)
-		}
+
+		// err = RegisterTool(registry, "take_screenshot", "截屏", ctrl.TakeScreenshot)
+		// if err != nil {
+		// 	panic(err)
+		// }
 		err = RegisterTool(registry, "list_packages", "列出包", ctrl.ListPackages)
 		if err != nil {
 			panic(err)
 		}
-		// err = RegisterTool(registry, "complete", "完成任务", ctrl.Complete)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		err = RegisterTool(registry, "get_phone_state", "获取手机状态", ctrl.GetPhoneState)
+		err = RegisterTool(registry, "complete", "完成任务", ctrl.Complete)
 		if err != nil {
 			panic(err)
 		}
+		// err = RegisterTool(registry, "get_phone_state", "获取手机状态", ctrl.GetPhoneState)
+		// if err != nil {
+		// 	panic(err)
+		// }
 	}
 	return ctrl
 }
@@ -255,7 +257,7 @@ func (t *Controller) filterUIElements(elements []UIElement) []UIElement {
 
 // TapByIndex 通过索引点击元素
 type TapByIndexParams struct {
-	Index int `json:"index"`
+	Index int `json:"index" jsonschema:"description=元素索引(来源于clickable elements中元素的index字段值)"`
 }
 
 func (t *Controller) TapByIndex(ctx context.Context, params TapByIndexParams) (*ActionResult, error) {
@@ -295,19 +297,19 @@ func (t *Controller) findElementByIndex(elements []UIElement, targetIndex int) *
 // parseBounds 解析边界字符串并返回中心坐标
 func (t *Controller) parseBounds(bounds string) (int, int, error) {
 	// 解析格式: "[x1,y1][x2,y2]"
-	re := regexp.MustCompile(`\[(\d+),(\d+)\]\[(\d+),(\d+)\]`)
-	matches := re.FindStringSubmatch(bounds)
-	if len(matches) != 5 {
-		return 0, 0, fmt.Errorf("无效的边界格式: %s", bounds)
-	}
+	// re := regexp.MustCompile(`\[(\d+),(\d+)\]\[(\d+),(\d+)\]`)
+	// matches := re.FindStringSubmatch(bounds)
+	// if len(matches) != 5 {
+	// 	return 0, 0, fmt.Errorf("无效的边界格式: %s", bounds)
+	// }
+	matches := strings.Split(bounds, ",")
+	left, _ := parseInt(matches[0])
+	top, _ := parseInt(matches[1])
+	right, _ := parseInt(matches[2])
+	bottom, _ := parseInt(matches[3])
 
-	x1, _ := parseInt(matches[1])
-	y1, _ := parseInt(matches[2])
-	x2, _ := parseInt(matches[3])
-	y2, _ := parseInt(matches[4])
-
-	centerX := (x1 + x2) / 2
-	centerY := (y1 + y2) / 2
+	centerX := (left + right) / 2
+	centerY := (top + bottom) / 2
 
 	return centerX, centerY, nil
 }
@@ -373,7 +375,7 @@ func (t *Controller) InputText(ctx context.Context, params InputTextParams) (*Ac
 
 // PressKey 按键
 type PressKeyParams struct {
-	Keycode int `json:"keycode"`
+	Keycode int `json:"keycode" jsonschema:"enum=3,enum=4,enum=24,enum=25,enum=26,enum=82,description=按键码（通用码：\n- 3: HOME\n- 4: BACK\n- 24: VOLUME UP\n- 25: VOLUME DOWN\n- 26: POWER\n- 82: MENU）,required"`
 }
 
 func (t *Controller) PressKey(ctx context.Context, params PressKeyParams) (*ActionResult, error) {
@@ -433,15 +435,15 @@ type TakeScreenshotParams struct {
 	Quality int `json:"quality"`
 }
 
-func (t *Controller) TakeScreenshot(ctx context.Context, params TakeScreenshotParams) (*ActionResult, error) {
+func (t *Controller) TakeScreenshot(ctx context.Context, params TakeScreenshotParams) (string, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+		return "", fmt.Errorf("获取设备失败: %w", err)
 	}
 
 	localPath, _, err := device.TakeScreenshot(ctx, params.Quality)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("截屏失败: %w", err)}, fmt.Errorf("截屏失败: %w", err)
+		return "", fmt.Errorf("截屏失败: %w", err)
 	}
 
 	t.LastScreenshot = localPath
@@ -450,7 +452,7 @@ func (t *Controller) TakeScreenshot(ctx context.Context, params TakeScreenshotPa
 		Timestamp: time.Now(),
 	})
 
-	return &ActionResult{Success: true, Message: "截屏成功"}, nil
+	return localPath, nil
 }
 
 // ListPackages 列出包
@@ -483,10 +485,11 @@ type CompleteParams struct {
 	Reason  string `json:"reason"`
 }
 
-func (t *Controller) Complete(ctx context.Context, params CompleteParams) {
+func (t *Controller) Complete(ctx context.Context, params CompleteParams) (*ActionResult, error) {
 	t.Success = params.Success
 	t.Reason = params.Reason
 	t.Finished = true
+	return &ActionResult{Success: true, Message: "完成任务"}, nil
 }
 
 // GetPhoneState 获取手机状态

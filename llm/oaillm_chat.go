@@ -5,10 +5,8 @@ import (
 )
 
 // ChatCompletionRequest represents a request structure for chat completion API.
-type ChatCompletionRequest struct {
-	Messages       []*ChatCompletionMessage `json:"messages,omitnil,omitempty" name:"messages"`
-	*InvokeOptions                          // base request options
-}
+
+type ChatCompletionRequest map[string]any
 
 // ChatCompletionMessage ...
 type ChatCompletionMessage struct {
