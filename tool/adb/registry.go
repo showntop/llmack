@@ -38,7 +38,7 @@ func RegisterTool[T, D any](
 	}
 	r.Tools[name] = toolx
 	tool.Register(toolx)
-	log.Info("注册工具", "name", name, "description", description)
+	log.InfoContextf(context.Background(), "注册工具 name: %s description: %s", name, description)
 	return nil
 }
 

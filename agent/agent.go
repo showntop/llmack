@@ -25,6 +25,7 @@ type Agent struct {
 	stream  bool            `json:"-"` // 是否流式输出
 
 	// session
+	session   *storage.Session
 	SessionID string `json:"session_id"` // 会话ID, for 持久化信息
 	// context
 
@@ -148,6 +149,7 @@ func (agent *Agent) invoke(ctx context.Context, task string, options *InvokeOpti
 	}
 
 	agent.SessionID = session.ID
+	agent.session = session
 
 	defer func() { //  Update Agent Memory
 		log.DebugContextf(ctx, "agent response:\n")

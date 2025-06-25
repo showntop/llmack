@@ -1,11 +1,15 @@
 package adb
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/showntop/llmack/tool"
@@ -38,8 +42,58 @@ func (t *AdbTool) GetMobileCurrentScreenshot(ctx context.Context) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("screenshot path: ", localPath)
+	fmt.Println("\n\nscreenshot path: ", localPath)
 	return os.ReadFile(localPath)
+}
+
+func (t *AdbTool) GetMobileCurrentScreenshotObject(ctx context.Context) (any, error) {
+	localPath, err := t.controller.TakeScreenshot(ctx, TakeScreenshotParams{
+		Quality: 100,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.Post("http://v2.open.venus.oa.com/chat/temp/storage/info", "application/json", bytes.NewBuffer([]byte(fmt.Sprintf(`{
+		"model": "claude-3-7-sonnet-20250219",
+		"filename": "%s"
+	}`, localPath))))
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("screenshot cos response: ", string(body))
+	var respData struct {
+		Data struct {
+			BucketName  string `json:"bucketName"`
+			Endpoint    string `json:"endpoint"`
+			AccessKey   string `json:"accessKey"`
+			SecretKey   string `json:"secretKey"`
+			Token       string `json:"token"`
+			Region      string `json:"region"`
+			ExpiredTime string `json:"expiredTime"`
+			Filepath    string `json:"filepath"`
+			PutURL      string `json:"putUrl"`
+			GetURL      string `json:"getUrl"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &respData); err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"bucketName": respData.Data.BucketName,
+		"filepath":   respData.Data.Filepath,
+	}, nil
 }
 
 func (t *AdbTool) GetMobileCurrentClickableElements(ctx context.Context) ([]UIElement, error) {
@@ -75,6 +129,7 @@ func (t *AdbTool) DoActions(ctx context.Context, args string) (string, error) {
 			if err != nil {
 				return "", err
 			}
+			time.Sleep(5 * time.Second) // sleep for wait completed.
 			result = "\n<" + name + "_result>\n" + result + "\n<" + name + "_result/>\n"
 			results = append(results, result)
 		}

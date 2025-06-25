@@ -29,7 +29,7 @@ func MultipartContentImageURL(url string) *MultipartContent {
 	}
 }
 
-func MultipartContentCustom(typ string, content string) *MultipartContent {
+func MultipartContentCustom(typ string, content any) *MultipartContent {
 	return &MultipartContent{
 		Type: typ,
 		Data: content,
@@ -208,7 +208,7 @@ type ToolCall struct {
 }
 
 func (t *ToolCall) String() string {
-	return fmt.Sprintf("ToolCall=> id: %s type: %s index: %d function: {name: %s arguments: %s}", t.ID, t.Type, t.Index, t.Function.Name, t.Function.Arguments)
+	return fmt.Sprintf("id: %s type: %s index: %d function: {name: %s arguments: %s}", t.ID, t.Type, t.Index, t.Function.Name, t.Function.Arguments)
 }
 
 // ToolCallFunction ...

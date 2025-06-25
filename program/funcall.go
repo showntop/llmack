@@ -106,7 +106,11 @@ func (rp *funcall) invoke(ctx context.Context, messages []llm.Message, query str
 	}
 	rp.reponse.message = llm.NewAssistantMessage(answer)
 	if len(toolCalls) > 0 {
-		log.InfoContextf(ctx, "program funcall invoke tools toolcalls: %v", toolCalls)
+		// 格式化输出 pretty
+		log.InfoContextf(ctx, "program funcall invoke tools:")
+		for i := 0; i < len(toolCalls); i++ {
+			log.InfoContextf(ctx, "%d: %s", i+1, toolCalls[i])
+		}
 		rp.observers = append(rp.observers, llm.NewAssistantMessage(answer).WithToolCalls(toolCalls))
 		toolResults, err := rp.invokeTools(ctx, toolCalls)
 		if err != nil { // 调用工具出错
@@ -116,7 +120,10 @@ func (rp *funcall) invoke(ctx context.Context, messages []llm.Message, query str
 			rp.reponse.err = err
 			return rp.predictor, finish
 		}
-		log.InfoContextf(ctx, "program funcall invoke tools result %v", toolResults)
+		log.InfoContextf(ctx, "\nprogram funcall invoke tools result:")
+		for i := range toolCalls {
+			log.InfoContextf(ctx, "%d: %s", i+1, toolResults[toolCalls[i].ID])
+		}
 		// 记录工具调用
 		for i := range toolCalls {
 			rp.observers = append(rp.observers, llm.NewToolMessage(toolResults[toolCalls[i].ID], toolCalls[i].ID))

@@ -12,7 +12,7 @@ import (
 var Name = "doubao"
 
 func init() {
-	llm.Register(Name, NewLLM())
+	llm.Register(Name, NewLLM)
 }
 
 // LLM ...
@@ -22,7 +22,7 @@ type LLM struct {
 }
 
 // NewLLM ...
-func NewLLM() *LLM {
+func NewLLM(o *llm.ProviderOptions) llm.Provider {
 	return &LLM{}
 }
 
