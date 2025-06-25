@@ -68,6 +68,7 @@ func NewController(serial string) *Controller {
 		if err != nil {
 			panic(err)
 		}
+
 		// err = RegisterTool(registry, "take_screenshot", "截屏", ctrl.TakeScreenshot)
 		// if err != nil {
 		// 	panic(err)
