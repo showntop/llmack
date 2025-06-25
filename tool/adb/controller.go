@@ -329,7 +329,8 @@ func (t *Controller) TapByCoordinates(ctx context.Context, params TapByCoordinat
 	if err := device.Tap(ctx, params.X, params.Y); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("点击失败: %w", err)}, fmt.Errorf("点击失败: %w", err)
 	}
-
+	// time.sleep
+	time.Sleep(5 * time.Second)
 	return &ActionResult{Success: true, Message: "点击成功"}, nil
 }
 
@@ -351,7 +352,7 @@ func (t *Controller) Swipe(ctx context.Context, params SwipeParams) (*ActionResu
 	if err := device.Swipe(ctx, params.StartX, params.StartY, params.EndX, params.EndY, params.DurationMs); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("滑动失败: %w", err)}, fmt.Errorf("滑动失败: %w", err)
 	}
-
+	time.Sleep(5 * time.Second)
 	return &ActionResult{Success: true, Message: "滑动成功"}, nil
 }
 
@@ -369,6 +370,7 @@ func (t *Controller) InputText(ctx context.Context, params InputTextParams) (*Ac
 	if err := device.InputText(ctx, params.Text); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("输入失败: %w", err)}, fmt.Errorf("输入失败: %w", err)
 	}
+	time.Sleep(3 * time.Second)
 
 	return &ActionResult{Success: true, Message: "输入成功"}, nil
 }
@@ -387,6 +389,7 @@ func (t *Controller) PressKey(ctx context.Context, params PressKeyParams) (*Acti
 	if err := device.PressKey(ctx, params.Keycode); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("按键失败: %w", err)}, fmt.Errorf("按键失败: %w", err)
 	}
+	time.Sleep(3 * time.Second)
 
 	return &ActionResult{Success: true, Message: "按键成功"}, nil
 }
@@ -406,7 +409,7 @@ func (t *Controller) StartApp(ctx context.Context, params StartAppParams) (*Acti
 	if err := device.StartApp(ctx, params.Pkg, params.Activity); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("启动应用失败: %w", err)}, fmt.Errorf("启动应用失败: %w", err)
 	}
-
+	time.Sleep(10 * time.Second)
 	return &ActionResult{Success: true, Message: "启动应用成功"}, nil
 }
 

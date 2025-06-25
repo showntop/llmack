@@ -67,7 +67,6 @@ func (t *AdbTool) DoActions(ctx context.Context, args string) (string, error) {
 	if err := json.Unmarshal([]byte(args), &params); err != nil {
 		return "", err
 	}
-
 	results := []string{}
 	for _, action := range params.Actions {
 		for name, params := range action {
@@ -81,6 +80,10 @@ func (t *AdbTool) DoActions(ctx context.Context, args string) (string, error) {
 		}
 	}
 	return strings.Join(results, "\n\n"), nil
+}
+
+func (t *AdbTool) AtomicActions() map[string]*tool.Tool {
+	return registry.Tools
 }
 
 func (t *AdbTool) NewTools() []any {

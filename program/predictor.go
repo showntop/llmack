@@ -27,6 +27,7 @@ type predictor struct {
 
 // Invoker 定义了 predictor 的调用方式
 type Invoker interface {
+	InvokeOnce(ctx context.Context, messages []llm.Message) *predictor
 	Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *predictor
 }
 
@@ -170,6 +171,19 @@ func (p *predictor) Invoke(ctx context.Context, messages []llm.Message, query st
 	completion := response.Result().Message.Content()
 	p.reponse.message = llm.NewAssistantMessage(completion)
 	return p
+}
+
+func (p *predictor) InvokeOnce(ctx context.Context, messages []llm.Message) *predictor {
+	panic("not implemented")
+}
+
+func (p *predictor) InvokeOnceWithMessages(ctx context.Context, messages []llm.Message) *predictor {
+	p.reponse = NewResponse()
+	if p.stream {
+		go p.invoker.InvokeOnce(ctx, messages)
+		return p
+	}
+	return p.invoker.InvokeOnce(ctx, messages)
 }
 
 // FetchHistoryMessages fetch history messages
