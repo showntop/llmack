@@ -27,8 +27,8 @@ type MobileAgent struct {
 }
 
 // NewMobileAgent ...
-func NewMobileAgent(name string, options ...Option) *MobileAgent {
-	ctrl := adb.NewController("47.96.179.122:1000")
+func NewMobileAgent(name string, deviceID string, options ...Option) *MobileAgent {
+	ctrl := adb.NewController(deviceID)
 	agent := &MobileAgent{
 		Agent:            *NewAgent(name, options...),
 		mobileController: ctrl,
@@ -76,6 +76,7 @@ func (agent *MobileAgent) invoke(ctx context.Context, task string, options *Invo
 	}
 
 	agent.SessionID = session.ID
+	agent.session = session
 
 	defer func() { //  Update Agent Memory
 
@@ -123,10 +124,20 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 	// prompt += "You are designed to use mobile device to automate tasks.\n"
 	// prompt += "Your goal is to accomplish the ultimate task following the rules.\n"
 	prompt += androidAgentInstruction
+	var initialMessages []llm.Message
+	if len(agent.session.Messages) > 0 {
+		initialMessages = agent.session.Messages
+	} else {
+		initialMessages = agent.getInitialMessages(ctx, task)
+	}
 	predictor := program.FunCall(
 		program.WithLLMInstance(agent.llm),
 		program.WithMaxIterationNum(500),
 		program.WithResetMessages(func(ctx context.Context, messages []llm.Message) []llm.Message {
+			// update session messages
+			agent.storage.UpdateSession(ctx, &storage.Session{
+				Messages: messages,
+			})
 			newMessages := []llm.Message{}
 			if len(messages) > 15 { // 轮次过多，summary
 				// 重新组织 messags, 删除过早的 assistant 和 tool 的消息
@@ -166,6 +177,7 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 			}
 
 			screenshot, err := agent.adbTool.GetMobileCurrentScreenshot(ctx)
+			// screenshot, err := agent.adbTool.GetMobileCurrentScreenshotObject(ctx)
 			if err != nil {
 				log.ErrorContextf(ctx, "get mobile current screenshot error: %v", err)
 				// return newMessages
@@ -192,7 +204,10 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 			}
 			newMessages = append(newMessages, llm.NewUserMultipartMessage(
 				llm.MultipartContentImageBase64("png", screenshot),
-				llm.MultipartContentText(fmt.Sprintf(`the current screenshot image is 720x1280, you can use it to help you complete the task`)),
+				// llm.MultipartContentCustom("venus_image_url", map[string]any{
+				// 	"venus_image_url": screenshot,
+				// }),
+				llm.MultipartContentText(fmt.Sprintf(`the image given above is the current screenshot of mobile with resolution 720x1280, you can use it to help you complete the task`)),
 				llm.MultipartContentText(fmt.Sprintf(`the current clickable elements: \n %s`, elementsJSON)),
 				llm.MultipartContentText(fmt.Sprintf(`the current phone state: \n %s`, stateJSON)),
 			))
@@ -209,7 +224,7 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 				"name": mobileToolName,
 			},
 		}).
-		InvokeWithMessages(ctx, agent.getInitialMessages(ctx, task))
+		InvokeWithMessages(ctx, initialMessages)
 	if predictor.Error() != nil {
 		agent.response.Error = predictor.Error()
 		return agent.response, predictor.Error()
@@ -375,6 +390,13 @@ func (agent *MobileAgent) fetchOrCreateSession(ctx context.Context, sessionID st
 
 var (
 	androidAgentInstruction = `
-You are a GUI agent that can use mobile device to automate tasks.
+You are GUI agent for operating mobile phones. Your goal is to choose the correct actions to complete the user's ultimate task. Think as if you are a human user operating the phone.
+如果给你了当前屏幕的截图，你需要仔细审视是否符合当前目标的执行。
+
+使用中文回答。
+
+# attention
+如果 tap_by_index 没有达成任务，请使用 tap_by_coordinates 来完成任务。
+用 tap_by_coordinates 来进行区域筛选。
 	`
 )
