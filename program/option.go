@@ -1,6 +1,8 @@
 package program
 
 import (
+	"context"
+
 	"github.com/showntop/llmack/llm"
 )
 
@@ -16,5 +18,17 @@ func WithLLM(provider string, model string, opts ...llm.Option) option {
 func WithLLMInstance(model *llm.Instance) option {
 	return func(p *predictor) {
 		p.model = model
+	}
+}
+
+func WithMaxIterationNum(num int) option {
+	return func(p *predictor) {
+		p.maxIterationNum = num
+	}
+}
+
+func WithResetMessages(resetMessages func(ctx context.Context, messages []llm.Message) []llm.Message) option {
+	return func(p *predictor) {
+		p.resetMessages = resetMessages
 	}
 }

@@ -2,17 +2,16 @@ package program
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"sync"
 
 	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/log"
 	"github.com/showntop/llmack/prompt"
 	"github.com/showntop/llmack/tool"
-	"golang.org/x/sync/errgroup"
 )
 
-var MaxIterationNum = 20
+var MaxIterationNum = 2000
 
 // FunCall ...
 func FunCall(opts ...option) *predictor {
@@ -26,16 +25,17 @@ type funcall struct {
 	*predictor
 }
 
-func (rp *funcall) Invokex(ctx context.Context, query string) *predictor {
+func (rp *funcall) Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *predictor {
 	// at end recycle response stream
 	defer close(rp.reponse.stream)
 
+	maxIterationNum := min(rp.maxIterationNum, MaxIterationNum)
 	// 迭代次数
-	for i := range MaxIterationNum {
-		if i == MaxIterationNum-1 { // remove tool
+	for i := range maxIterationNum {
+		if i == maxIterationNum-1 { // remove tool
 			rp.tools = []any{}
 		}
-		p, finish := rp.invoke(ctx, query)
+		p, finish := rp.invoke(ctx, messages, query, inputs)
 		if p.reponse.err != nil {
 			return p
 		}
@@ -47,8 +47,19 @@ func (rp *funcall) Invokex(ctx context.Context, query string) *predictor {
 	return rp.predictor
 }
 
-func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) {
-	llmResponse, err := rp.invokeLLM(ctx, query)
+func (rp *funcall) invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) (*predictor, bool) {
+	systemMessages, err := rp.adapter.Format(rp.predictor, rp.inputs, nil) // system message
+	if err != nil {
+		rp.reponse.err = err
+		return rp.predictor, false
+	}
+	messages = append(systemMessages, messages...)
+
+	if len(query) > 0 {
+		messages = append(messages, llm.NewUserTextMessage(query))
+	}
+
+	llmResponse, err := rp.invokeLLM(ctx, messages)
 	if err != nil {
 		rp.reponse.err = err
 		return rp.predictor, false
@@ -91,7 +102,11 @@ func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) 
 	}
 	rp.reponse.message = llm.NewAssistantMessage(answer)
 	if len(toolCalls) > 0 {
-		log.InfoContextf(ctx, "program funcall invoke tools toolcalls: %v", toolCalls)
+		// 格式化输出 pretty
+		log.InfoContextf(ctx, "program funcall invoke tools:")
+		for i := 0; i < len(toolCalls); i++ {
+			log.InfoContextf(ctx, "%d: %s", i+1, toolCalls[i])
+		}
 		rp.observers = append(rp.observers, llm.NewAssistantMessage(answer).WithToolCalls(toolCalls))
 		toolResults, err := rp.invokeTools(ctx, toolCalls)
 		if err != nil { // 调用工具出错
@@ -101,7 +116,10 @@ func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) 
 			rp.reponse.err = err
 			return rp.predictor, finish
 		}
-		// log.InfoContextf(ctx, "program funcall invoke tools result %v", toolResults)
+		log.InfoContextf(ctx, "\nprogram funcall invoke tools result:")
+		for i := range toolCalls {
+			log.InfoContextf(ctx, "%d: %s", i+1, toolResults[toolCalls[i].ID])
+		}
 		// 记录工具调用
 		for i := range toolCalls {
 			rp.observers = append(rp.observers, llm.NewToolMessage(toolResults[toolCalls[i].ID], toolCalls[i].ID))
@@ -115,19 +133,20 @@ func (rp *funcall) invoke(ctx context.Context, query string) (*predictor, bool) 
 }
 
 // invokeFuncall ...
-func (rp *funcall) invokeLLM(ctx context.Context, query string) (*llm.Response, error) {
+func (rp *funcall) invokeLLM(ctx context.Context, messages []llm.Message) (*llm.Response, error) {
 	messageTools := rp.buildTools(rp.tools...)
-
-	messages, err := rp.adapter.Format(rp.predictor, rp.inputs, nil) // system message
-	if err != nil {
-		return nil, err
+	if len(messageTools) <= 0 {
+		rp.toolChoice = "none"
 	}
-	messages = append(messages, llm.NewUserTextMessage(query))
 	// append observer message
 	messages = append(messages, rp.observers...)
+	if rp.resetMessages != nil {
+		messages = rp.resetMessages(ctx, messages)
+	}
 	response, err := rp.model.Invoke(ctx, messages,
 		llm.WithTools(messageTools...),
 		llm.WithStream(true),
+		llm.WithToolChoice(rp.toolChoice),
 	)
 	if err != nil {
 		return nil, err
@@ -188,31 +207,18 @@ func (rp *funcall) renderContexts(ctx context.Context, settings any, query strin
 func (rp *funcall) buildTools(tools ...any) []*llm.Tool {
 	messageTools := make([]*llm.Tool, 0)
 	for _, tl := range tools {
+		if tl == nil {
+			continue
+		}
 		tool := tool.Spawn(tl.(string)) // 暂时只支持 string
 		messageTool := &llm.Tool{
 			Type: "function",
 			Function: &llm.FunctionDefinition{
 				Name:        tool.Name,
 				Description: tool.Description,
-				Parameters: map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-					"required":   []string{},
-				},
+				Parameters:  tool.Parameters(),
 			},
 		}
-
-		for _, p := range tool.Parameters {
-			properties := messageTool.Function.Parameters["properties"].(map[string]any)
-			properties[p.Name] = map[string]any{
-				"description": p.LLMDescrition,
-				"type":        p.Type,
-			}
-			if p.Required {
-				messageTool.Function.Parameters["required"] = append(messageTool.Function.Parameters["required"].([]string), p.Name)
-			}
-		}
-
 		messageTools = append(messageTools, messageTool)
 	}
 	return messageTools
@@ -221,15 +227,13 @@ func (rp *funcall) buildTools(tools ...any) []*llm.Tool {
 func (rp *funcall) invokeTools(ctx context.Context, toolCalls []*llm.ToolCall) (map[string]string, error) {
 	// 并发调用
 	ch := make(chan [2]string, len(toolCalls))
-	wg := errgroup.Group{}
+	// wg := errgroup.Group{}
+	wg := sync.WaitGroup{}
 	for _, toolCall := range toolCalls {
-		wg.Go(func() error {
-			var args map[string]any
-			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-				ch <- [2]string{toolCall.ID, "error with " + err.Error()}
-				return err
-			}
-			toolResult, err := tool.Spawn(toolCall.Function.Name).Invoke(ctx, args)
+		wg.Add(1)
+		go func() error {
+			defer wg.Done()
+			toolResult, err := tool.Spawn(toolCall.Function.Name).Invoke(ctx, toolCall.Function.Arguments)
 			if err != nil {
 				ch <- [2]string{toolCall.ID, "error with " + err.Error()}
 				return err
@@ -237,12 +241,11 @@ func (rp *funcall) invokeTools(ctx context.Context, toolCalls []*llm.ToolCall) (
 			// log.InfoContextf(ctx, "program funcall invoke tool: %s, %s response: %s error: %v \n", toolCall.ID, toolCall.Function.Arguments, toolResult, err)
 			ch <- [2]string{toolCall.ID, toolResult}
 			return nil
-		})
+		}()
 	}
 
-	var err error
 	go func() {
-		err = wg.Wait()
+		wg.Wait()
 		close(ch)
 	}()
 
@@ -250,5 +253,5 @@ func (rp *funcall) invokeTools(ctx context.Context, toolCalls []*llm.ToolCall) (
 	for result := range ch {
 		results[result[0]] = result[1]
 	}
-	return results, err
+	return results, nil
 }

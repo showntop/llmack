@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -100,20 +101,30 @@ func (t *Team) Invoke(ctx context.Context, query string, optfuncs ...InvokeOptio
 }
 
 func (t *Team) setSharedContext() string {
-	fun := func(ctx context.Context, args map[string]any) (string, error) {
-		return t.memory.SetSharedContext(ctx, args["state"].(string))
+	fun := func(ctx context.Context, args string) (string, error) {
+		var params struct {
+			State string `json:"state"`
+		}
+		if err := json.Unmarshal([]byte(args), &params); err != nil {
+			return "", err
+		}
+		return t.memory.SetSharedContext(ctx, params.State)
 	}
-	tl := &tool.Tool{}
-	tl.Name = "setSharedContext"
-	tl.Kind = "code"
-	tl.Description = "Set or update the team's shared context with the given state."
-	tl.Parameters = append(tl.Parameters, tool.Parameter{
-		Name:          "state",
-		Type:          "string",
-		LLMDescrition: "The state to set as the team context.",
-		Required:      true,
-	})
-	tl.Invokex = fun
+	tl := tool.New(
+		tool.WithName("setSharedContext"),
+		tool.WithKind("code"),
+		tool.WithDescription("Set or update the team's shared context with the given state."),
+		tool.WithParameters(
+			tool.Parameter{
+				Name:          "state",
+				Type:          tool.String,
+				LLMDescrition: "The state to set as the team context.",
+				Required:      true,
+			},
+		),
+		tool.WithFunction(fun),
+	)
+
 	tool.Register(tl)
 
 	return tl.Name
@@ -124,11 +135,20 @@ func (t *Team) DebugAssignTask() string {
 }
 
 func (t *Team) assignTask() string {
-	fun := func(ctx context.Context, args map[string]any) (string, error) {
+	fun := func(ctx context.Context, args string) (string, error) {
+		var params struct {
+			MemberName     string `json:"member_name"`
+			Task           string `json:"task"`
+			ExpectedOutput string `json:"expected_output"`
+		}
+		if err := json.Unmarshal([]byte(args), &params); err != nil {
+			return "", err
+		}
+
 		// find the agent
-		memberID := args["member_name"].(string)
-		task := args["task"].(string)
-		expectedOutput := args["expected_output"].(string)
+		memberID := params.MemberName
+		task := params.Task
+		expectedOutput := params.ExpectedOutput
 
 		var agent *Agent
 		for _, a := range t.members {
@@ -196,36 +216,50 @@ func (t *Team) assignTask() string {
 		// log.InfoContextf(ctx, "agent %s completed with response: %s", agent.Name, agentResponse.Answer)
 		return agentResponse.Completion(), nil
 	}
-	tl := &tool.Tool{}
-	tl.Name = "assign_task_to_member"
-	tl.Description = "Use this function to transfer a task to the selected team member.\nYou must provide a clear and concise description of the task the member should achieve AND the expected output."
-	tl.Parameters = append(tl.Parameters, tool.Parameter{
-		Name:          "member_name",
-		Type:          "string",
-		LLMDescrition: "The name of the member agent who will be assigned the task.",
-		Required:      true,
-	}, tool.Parameter{
-		Name:          "task",
-		Type:          "string",
-		LLMDescrition: "A clear and concise description of the task the member agent should achieve.",
-		Required:      true,
-	}, tool.Parameter{
-		Name:          "expected_output",
-		Type:          "string",
-		LLMDescrition: "The expected output from the member agent (optional).",
-		Required:      true,
-	})
-	tl.Invokex = fun
+
+	tl := tool.New(
+		tool.WithName("assign_task_to_member"),
+		tool.WithKind("code"),
+		tool.WithDescription(""),
+		tool.WithParameters(
+			tool.Parameter{
+				Name:          "member_name",
+				Type:          tool.String,
+				LLMDescrition: "The name of the member agent who will be assigned the task.",
+				Required:      true,
+			},
+			tool.Parameter{
+				Name:          "task",
+				Type:          tool.String,
+				LLMDescrition: "A clear and concise description of the task the member agent should achieve.",
+				Required:      true,
+			},
+			tool.Parameter{
+				Name:          "expected_output",
+				Type:          tool.String,
+				LLMDescrition: "The expected output from the member agent (optional).",
+				Required:      false,
+			},
+		),
+		tool.WithFunction(fun),
+	)
+
 	tool.Register(tl)
 
 	return tl.Name
 }
 
 func (t *Team) distributeTask() string {
-	fun := func(ctx context.Context, args map[string]any) (string, error) {
+	fun := func(ctx context.Context, args string) (string, error) {
+		var params struct {
+			AgentName      string `json:"agent"`
+			ExpectedOutput string `json:"expected_output"`
+		}
+		if err := json.Unmarshal([]byte(args), &params); err != nil {
+			return "", err
+		}
 		// find the agent
-		agentName := args["agent"].(string)
-		expectedOutput := args["expected_output"].(string)
+		agentName := params.AgentName
 
 		var agent *Agent
 		for _, a := range t.members {
@@ -238,7 +272,7 @@ func (t *Team) distributeTask() string {
 			return "", fmt.Errorf("agent not found")
 		}
 		// run the agent
-		response := agent.Invoke(ctx, expectedOutput)
+		response := agent.Invoke(ctx, params.ExpectedOutput)
 		if response.Error != nil {
 			return "", response.Error
 		}
@@ -249,7 +283,7 @@ func (t *Team) distributeTask() string {
 	tl.Name = "distribute_task"
 	tl.Kind = "code"
 	tl.Description = "Use this function to forward the request to the nominated agent."
-	tl.Parameters = append(tl.Parameters, tool.Parameter{
+	tl.WithParameters(tool.Parameter{
 		Name:          "agent",
 		Type:          "string",
 		LLMDescrition: "The name of the agent to transfer the task to.",
@@ -260,7 +294,8 @@ func (t *Team) distributeTask() string {
 		LLMDescrition: "The expected output from the agent.",
 		Required:      true,
 	})
-	tl.Invokex = fun
+	tl.WithInvokeFunc(fun)
+
 	tool.Register(tl)
 
 	return tl.Name

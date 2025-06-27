@@ -207,7 +207,7 @@ func (mi *Instance) handleBlockResponse(ctx context.Context, response *Response,
 		return response
 	}
 	// todo
-	_ = response.Result() // make result
+	// _ = response.Result() // make result
 	if updateCache != nil {
 		updateCache(ctx, response.result.Message.content) // TODO
 	}

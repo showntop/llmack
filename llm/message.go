@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 )
@@ -16,13 +17,41 @@ const (
 
 type MultipartContent struct {
 	Type string
-	Data string
+	Data any
 }
 
 func MultipartContentImageURL(url string) *MultipartContent {
 	return &MultipartContent{
 		Type: "image_url",
-		Data: url,
+		Data: map[string]any{
+			"url": url,
+		},
+	}
+}
+
+func MultipartContentCustom(typ string, content any) *MultipartContent {
+	return &MultipartContent{
+		Type: typ,
+		Data: content,
+	}
+}
+
+func MultipartContentImageBase64(format string, data []byte) *MultipartContent {
+	if len(data) == 0 {
+		return &MultipartContent{
+			Type: "image_url",
+			Data: map[string]any{
+				"url": nil,
+			},
+		}
+	}
+	header := fmt.Sprintf("data:image/%s;base64,", format)
+
+	return &MultipartContent{
+		Type: "image_url",
+		Data: map[string]any{
+			"url": header + base64.StdEncoding.EncodeToString(data),
+		},
 	}
 }
 
@@ -104,9 +133,10 @@ func NewUserMultipartMessage(contents ...*MultipartContent) PromptMessage {
 
 // NewAssistantMessage ...
 func NewAssistantMessage(text string) *AssistantMessage {
-	m := &AssistantMessage{PromptMessage: PromptMessage{}}
-	m.content = text
-	m.role = MessageRoleAssistant
+	m := &AssistantMessage{PromptMessage: PromptMessage{
+		role:    MessageRoleAssistant,
+		content: text,
+	}}
 	return m
 }
 
@@ -178,7 +208,7 @@ type ToolCall struct {
 }
 
 func (t *ToolCall) String() string {
-	return fmt.Sprintf("ToolCall=> id: %s type: %s index: %d function: {name: %s arguments: %s}", t.ID, t.Type, t.Index, t.Function.Name, t.Function.Arguments)
+	return fmt.Sprintf("id: %s type: %s index: %d function: {name: %s arguments: %s}", t.ID, t.Type, t.Index, t.Function.Name, t.Function.Arguments)
 }
 
 // ToolCallFunction ...

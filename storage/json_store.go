@@ -37,6 +37,16 @@ func (s *JSONStorage) SaveSession(ctx context.Context, session *Session) error {
 
 func (s *JSONStorage) FetchSession(ctx context.Context, id string) (*Session, error) {
 	filePath := filepath.Join(s.path, id+".json")
+	// 如果不存在就创建
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		_, err := os.Create(filePath)
+		if err != nil {
+			return nil, err
+		}
+		return &Session{
+			ID: id,
+		}, nil
+	}
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err

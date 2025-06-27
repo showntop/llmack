@@ -1,0 +1,78 @@
+{
+  "servers": {
+    "filesystem": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "description": "File system access MCP server for /tmp directory",
+      "enabled": true
+    },
+    "sqlite": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "./database.db"],
+      "description": "SQLite database MCP server",
+      "enabled": false
+    },
+    "brave-search": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "your-brave-api-key-here"
+      },
+      "description": "Brave search engine MCP server",
+      "enabled": false
+    },
+    "github": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-github-token-here"
+      },
+      "description": "GitHub repository access MCP server",
+      "enabled": false
+    },
+    "google-maps": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "your-google-maps-api-key-here"
+      },
+      "description": "Google Maps MCP server",
+      "enabled": false
+    },
+    "postgres": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://user:password@localhost:5432/database"
+      },
+      "description": "PostgreSQL database MCP server",
+      "enabled": false
+    },
+    "puppeteer": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "description": "Web scraping with Puppeteer MCP server",
+      "enabled": false
+    },
+    "sequential-thinking": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "description": "Sequential thinking MCP server",
+      "enabled": false
+    },
+    "custom-server": {
+      "transport": "sse",
+      "url": "https://example.com/mcp",
+      "description": "Custom MCP server via SSE",
+      "enabled": false
+    }
+  }
+} 

@@ -1,5 +1,9 @@
 package tool
 
+import (
+	"github.com/getkin/kin-openapi/openapi3"
+)
+
 // ParameterType 枚举类型
 type ParameterType string
 
@@ -26,4 +30,34 @@ type Parameter struct {
 	Min              float64
 	Max              float64
 	Options          []string
+}
+
+type ParamsOneOf struct {
+	params1 []Parameter
+	params2 *openapi3.Schema
+}
+
+func (p *ParamsOneOf) Parameters() any {
+	if p == nil {
+		return nil
+	}
+	if len(p.params1) > 0 {
+		properties := map[string]any{}
+		required := []string{}
+		for _, p := range p.params1 {
+			properties[p.Name] = map[string]any{
+				"description": p.LLMDescrition,
+				"type":        p.Type,
+			}
+			if p.Required {
+				required = append(required, p.Name)
+			}
+		}
+		return map[string]any{
+			"type":       "object",
+			"properties": properties,
+			"required":   required,
+		}
+	}
+	return p.params2
 }

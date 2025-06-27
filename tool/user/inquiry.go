@@ -14,8 +14,13 @@ func init() {
 	t.Name = Inquery
 	t.Kind = "code"
 	t.Description = "询问用户的具体需求以提供个性化的服务"
-	t.Parameters = append(t.Parameters, tool.Parameter{})
-	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
+	t.Parameters = append(t.Parameters, tool.Parameter{
+		Name:        "inquiry",
+		Description: "询问用户的具体需求以提供个性化的服务",
+		Required:    true,
+		Type:        "string",
+	})
+	t.Invoke = func(ctx context.Context, args map[string]any) (string, error) {
 		// 等待用户输入
 		var input string
 		fmt.Println("请根据提示输入你的需求:")

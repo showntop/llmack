@@ -3,6 +3,7 @@ package storage
 import (
 	"time"
 
+	"github.com/showntop/llmack/llm"
 	"github.com/showntop/llmack/memory"
 )
 
@@ -14,6 +15,8 @@ type Session struct {
 	EngineData map[string]any `json:"engine_data" gorm:"column:engine_data;type:jsonb"`                // engine data
 
 	Memory memory.Memory `json:"memory"` // 记忆
+
+	Messages []llm.Message `json:"messages"`
 
 	CreatedAt time.Time `json:"created_at" gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at;autoUpdateTime"`
