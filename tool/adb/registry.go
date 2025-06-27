@@ -42,6 +42,10 @@ func RegisterTool[T, D any](
 	return nil
 }
 
+func RegisterGlobalTool[T, D any](name string, description string, function tool.ToolFunc[T, D]) error {
+	return RegisterTool(registry, name, description, function)
+}
+
 // ExecuteTool a registered action
 // TODO(LOW): support Context
 func (r *Registry) ExecuteTool(

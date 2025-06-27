@@ -39,6 +39,7 @@ type AgentRunResponse struct {
 	Error     error
 
 	Stream chan *llm.Chunk
+	Usage  llm.Usage
 }
 
 func (a *AgentRunResponse) Completion() string {

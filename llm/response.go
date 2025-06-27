@@ -3,7 +3,6 @@ package llm
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"io"
 )
 
@@ -37,6 +36,12 @@ func (resp *Response) Result() *Result {
 	toolcalls := []*ToolCall{}
 	currentTool := &ToolCall{Index: -1}
 	for it := resp.stream.Take(); it != nil; it = resp.stream.Take() {
+		resp.result.Usage.PromptTokens += it.Usage.PromptTokens
+		resp.result.Usage.CompletionTokens += it.Usage.CompletionTokens
+		resp.result.Usage.TotalTokens += it.Usage.TotalTokens
+		if len(it.Choices) <= 0 {
+			continue
+		}
 		deltaMessage := it.Choices[0].Delta
 		text += deltaMessage.content
 		reasoning += deltaMessage.ReasoningContent
@@ -64,7 +69,7 @@ type Result struct {
 	Model string `json:"model"`
 	// Messages          []*PromptMessage
 	Message           *AssistantMessage `json:"message"`
-	Usage             *Usage            `json:"usage"`
+	Usage             Usage             `json:"usage"`
 	SystemFingerprint string            `json:"system_fingerprint"`
 }
 
@@ -108,15 +113,15 @@ func buildChunkMessage(line []byte) (*Chunk, error) {
 		return nil, err
 	}
 
-	if len(mmm.Choices) <= 0 {
-		return nil, errors.New("no choices")
-	}
 	chunk := &Chunk{}
 	chunk.Usage = &mmm.Usage
 	chunk.ID = mmm.ID
 	chunk.CreatedAt = mmm.Created
 	chunk.Model = mmm.Model
 	chunk.Object = mmm.Object
+	if len(mmm.Choices) <= 0 {
+		return chunk, nil
+	}
 	// chunk.SystemFingerprint = mmm.SystemFingerprint
 	chunk.Choices = make([]*ChunkChoice, 1, 1)
 	chunk.Choices[0] = &ChunkChoice{}

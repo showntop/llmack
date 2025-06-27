@@ -143,7 +143,6 @@ func (o *OAILLM) handleStreamResponse(body io.ReadCloser) (*Response, error) {
 				}
 				break
 			}
-
 			chunk, err := buildChunkMessage(line) // TODO Unmarshal line
 			if err != nil {
 				log.ErrorContextf(context.Background(), "OAILLM handleStreamResponse buildChunkMessage error %s", err)

@@ -8,6 +8,12 @@ import (
 
 type option func(*predictor)
 
+func WithAdapter(adapter Adapter) option {
+	return func(p *predictor) {
+		p.adapter = adapter
+	}
+}
+
 func WithLLM(provider string, model string, opts ...llm.Option) option {
 	return func(p *predictor) {
 		opts = append(opts, llm.WithDefaultModel(model))

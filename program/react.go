@@ -35,27 +35,28 @@ type ReactResult struct {
 }
 
 // ReAct ...
-func ReAct(opts ...option) *react {
-	react := &react{}
+func ReAct(opts ...option) *predictor {
 
-	p := &predictor{
-		adapter: &RawAdapter{},
-		Promptx: Promptx{
-			Name:         "ReActAgent",
-			Instruction:  ReactPrompt,
-			Description:  "ReAct mode Agent for General tasks Solve.",
-			InputFields:  make(map[string]*Field),
-			OutputFields: make(map[string]*Field),
-		},
-	}
+	p := &predictor{}
 	for i := range opts {
 		opts[i](p)
 	}
 	if p.model == nil {
 		p.model = defaultLLM
 	}
-	react.predictor = p
-	return react
+	if p.adapter == nil {
+		p.adapter = &RawAdapter{}
+	}
+	if p.Prompt == "" {
+		p.Prompt = ReactPrompt
+	}
+	p.Name = "ReActAgent"
+	p.Description = "ReAct mode Agent for General tasks Solve."
+	p.InputFields = make(map[string]*Field)
+	p.OutputFields = make(map[string]*Field)
+	p.invoker = &react{predictor: p}
+
+	return p
 }
 
 func (rp *react) WithActions(actions ...any) *react {
@@ -91,16 +92,36 @@ func (rp *react) WithActions(actions ...any) *react {
 	return rp
 }
 
-func (rp *react) WithInstruction(i string) *react {
-	rp.userInstruction = i
-	instruction := rp.Instruction
-	instruction = strings.ReplaceAll(instruction, "{{instruction}}", i)
-	rp.predictor.Promptx.Instruction = instruction
-	return rp
+func (rp *react) InvokeOnce(ctx context.Context, messages []llm.Message) *predictor {
+	var result ReactResult
+	response, err := rp.model.Invoke(ctx, messages,
+		llm.WithStream(true),
+	)
+	if err != nil {
+		rp.reponse.err = err
+		return rp.predictor
+	}
+	rawResult := response.Result().Message.Content()
+	rawResult = strings.TrimLeft(rawResult, "```json")
+	rawResult = strings.TrimLeft(rawResult, "```")
+	rawResult = strings.TrimRight(rawResult, "```")
+	rawResult = strings.ReplaceAll(rawResult, "\n", "")
+	if err := json.Unmarshal([]byte(rawResult), &result); err != nil {
+		log.WarnContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, err)
+		rp.reponse.err = err
+		return rp.predictor
+	}
+	if result.Thoughts == nil {
+		log.WarnContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, err)
+		rp.reponse.err = fmt.Errorf("no result")
+		return rp.predictor
+	}
+	log.InfoContextf(ctx, "react agent invoke response: %s error: %v \n", rawResult, err)
+	return rp.predictor
 }
 
 // Invoke invoke forward for predicte
-func (rp *react) Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *Response {
+func (rp *react) Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *predictor {
 	var value Response = Response{p: rp.predictor, stream: make(chan *llm.Chunk, 10000)}
 	value.p = rp.predictor
 
@@ -145,7 +166,7 @@ func (rp *react) Invoke(ctx context.Context, messages []llm.Message, query strin
 		llm.WithStream(true),
 	)
 	if err != nil {
-		return &value
+		return rp.predictor
 	}
 	stream := response.Stream()
 	var answer string
@@ -155,7 +176,7 @@ func (rp *react) Invoke(ctx context.Context, messages []llm.Message, query strin
 	}
 	value.completion = answer
 	close(value.stream)
-	return &value
+	return rp.predictor
 }
 
 func (rp *react) invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any, thoughts []map[string]any) (*ReactResult, error) {

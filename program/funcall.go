@@ -25,6 +25,10 @@ type funcall struct {
 	*predictor
 }
 
+func (rp *funcall) InvokeOnce(ctx context.Context, messages []llm.Message) *predictor {
+	panic("not implemented")
+}
+
 func (rp *funcall) Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *predictor {
 	// at end recycle response stream
 	defer close(rp.reponse.stream)
@@ -85,6 +89,9 @@ func (rp *funcall) invoke(ctx context.Context, messages []llm.Message, query str
 		return t
 	}
 	for chunk := range stream.Next() {
+		rp.Usage.PromptTokens += chunk.Usage.PromptTokens
+		rp.Usage.CompletionTokens += chunk.Usage.CompletionTokens
+		rp.Usage.TotalTokens += chunk.Usage.TotalTokens
 		deltaMessage := chunk.Choices[0].Delta
 		if len(deltaMessage.ToolCalls) > 0 { // tool call
 			for i := range deltaMessage.ToolCalls {

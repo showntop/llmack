@@ -121,16 +121,6 @@ func NewInstance(provider string, opts ...Option) *Instance {
 // Invoke ...
 func (mi *Instance) Invoke(ctx context.Context,
 	messages []Message, options ...InvokeOption) (*Response, error) {
-
-	if mi.provider == nil {
-		return nil, fmt.Errorf("llm provider of %v is not registered", mi.name)
-	}
-	if mi.opts != nil && mi.opts.hooks != nil {
-		for _, hook := range mi.opts.hooks {
-			ctx = hook.OnBeforeInvoke(ctx)
-		}
-	}
-
 	// 删除 options 中 nil
 	for i := 0; i < len(options); i++ {
 		if options[i] == nil {
@@ -138,22 +128,7 @@ func (mi *Instance) Invoke(ctx context.Context,
 			i--
 		}
 	}
-	response, err := mi.invoke(ctx, messages, options...)
-
-	if mi.opts != nil && mi.opts.hooks != nil {
-		for _, hook := range mi.opts.hooks {
-			hook.OnAfterInvoke(ctx, err)
-		}
-	}
-	return response, err
-}
-
-func (mi *Instance) invoke(ctx context.Context,
-	messages []Message, options ...InvokeOption) (*Response, error) {
-
-	updateCache := func(ctx context.Context, result string) {} // nothing todo
-
-	invokeOpts := mi.opts.InvokeOptions
+	invokeOpts := mi.opts.InvokeOptions // default invoke options
 	if invokeOpts == nil {
 		invokeOpts = &InvokeOptions{}
 	}
@@ -163,6 +138,32 @@ func (mi *Instance) invoke(ctx context.Context,
 		}
 		options[i](invokeOpts)
 	}
+	return mi.InvokeWithOptions(ctx, messages, invokeOpts)
+}
+
+func (mi *Instance) InvokeWithOptions(ctx context.Context,
+	messages []Message, invokeOpts *InvokeOptions) (*Response, error) {
+	if mi.provider == nil {
+		return nil, fmt.Errorf("llm provider of %v is not registered", mi.name)
+	}
+	if mi.opts != nil && mi.opts.hooks != nil {
+		for _, hook := range mi.opts.hooks {
+			ctx = hook.OnBeforeInvoke(ctx)
+		}
+	}
+	response, err := mi.invoke(ctx, messages, invokeOpts)
+	if mi.opts != nil && mi.opts.hooks != nil {
+		for _, hook := range mi.opts.hooks {
+			hook.OnAfterInvoke(ctx, err)
+		}
+	}
+	return response, err
+}
+
+func (mi *Instance) invoke(ctx context.Context,
+	messages []Message, invokeOpts *InvokeOptions) (*Response, error) {
+
+	updateCache := func(ctx context.Context, result string) {} // nothing todo
 
 	if mi.opts.cache != nil && len(invokeOpts.Tools) <= 0 { // fetch from cache
 		document, hited, err := mi.opts.cache.Fetch(ctx, messages)
@@ -233,16 +234,16 @@ func (mi *Instance) handleStreamResponse(ctx context.Context, response *Response
 					ctx = hook.OnFirstChunk(ctx, nil)
 				}
 			}
-			if len(chunk.Choices) <= 0 {
-				mi.opts.logger.WarnContextf(ctx, "llm stream response chunk choices is empty")
-				continue
-			}
+			// if len(chunk.Choices) <= 0 {
+			// 	mi.opts.logger.WarnContextf(ctx, "llm stream response chunk choices is empty")
+			// 	continue
+			// }
 			firstChunk = false
 			newResp.stream.Push(chunk)
-			if chunk.Choices[0].Delta.ReasoningContent != "" {
+			if len(chunk.Choices) > 0 {
 				result += chunk.Choices[0].Delta.ReasoningContent
+				result += chunk.Choices[0].Delta.content
 			}
-			result += chunk.Choices[0].Delta.content
 		}
 		if updateCache != nil {
 			updateCache(ctx, result)

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -53,8 +54,19 @@ func (s *JSONStorage) FetchSession(ctx context.Context, id string) (*Session, er
 	}
 	defer file.Close()
 
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(content) == 0 {
+		return &Session{
+			ID: id,
+		}, nil
+	}
+
 	var session Session
-	if err := json.NewDecoder(file).Decode(&session); err != nil {
+	if err := json.Unmarshal(content, &session); err != nil {
 		return nil, err
 	}
 

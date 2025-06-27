@@ -18,6 +18,7 @@ type Field struct {
 type Promptx struct {
 	Name         string
 	Description  string
+	Prompt       string
 	Instruction  string
 	InputFields  map[string]*Field
 	OutputFields map[string]*Field

@@ -329,7 +329,8 @@ func (t *Controller) TapByCoordinates(ctx context.Context, params TapByCoordinat
 	if err := device.Tap(ctx, params.X, params.Y); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("点击失败: %v", err)}, fmt.Errorf("点击失败: %v", err)
 	}
-
+	// time.sleep
+	time.Sleep(5 * time.Second)
 	return &ActionResult{Success: true, Message: "点击成功"}, nil
 }
 
@@ -351,7 +352,7 @@ func (t *Controller) Swipe(ctx context.Context, params SwipeParams) (*ActionResu
 	if err := device.Swipe(ctx, params.StartX, params.StartY, params.EndX, params.EndY, params.DurationMs); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("滑动失败: %w", err)}, fmt.Errorf("滑动失败: %w", err)
 	}
-
+	time.Sleep(5 * time.Second)
 	return &ActionResult{Success: true, Message: "滑动成功"}, nil
 }
 
@@ -369,13 +370,14 @@ func (t *Controller) InputText(ctx context.Context, params InputTextParams) (*Ac
 	if err := device.InputText(ctx, params.Text); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("输入失败: %w", err)}, fmt.Errorf("输入失败: %w", err)
 	}
+	time.Sleep(3 * time.Second)
 
 	return &ActionResult{Success: true, Message: "输入成功"}, nil
 }
 
 // PressKey 按键
 type PressKeyParams struct {
-	Keycode int `json:"keycode" jsonschema:"enum=3,enum=4,enum=24,enum=25,enum=26,enum=82,description=按键码（通用码：\n- 3: HOME\n- 4: BACK\n- 24: VOLUME UP\n- 25: VOLUME DOWN\n- 26: POWER\n- 82: MENU）,required"`
+	Keycode int `json:"keycode" jsonschema:"enum=3,enum=4,enum=24,enum=25,enum=26,enum=82,description=按键码意义（3: HOME, 4: BACK, 24: VOLUME UP, 25: VOLUME DOWN, 26: POWER, 82: MENU）,required"`
 }
 
 func (t *Controller) PressKey(ctx context.Context, params PressKeyParams) (*ActionResult, error) {
@@ -387,6 +389,7 @@ func (t *Controller) PressKey(ctx context.Context, params PressKeyParams) (*Acti
 	if err := device.PressKey(ctx, params.Keycode); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("按键失败: %w", err)}, fmt.Errorf("按键失败: %w", err)
 	}
+	time.Sleep(3 * time.Second)
 
 	return &ActionResult{Success: true, Message: "按键成功"}, nil
 }
@@ -406,7 +409,7 @@ func (t *Controller) StartApp(ctx context.Context, params StartAppParams) (*Acti
 	if err := device.StartApp(ctx, params.Pkg, params.Activity); err != nil {
 		return &ActionResult{Success: false, Message: fmt.Sprintf("启动应用失败: %w", err)}, fmt.Errorf("启动应用失败: %w", err)
 	}
-
+	time.Sleep(10 * time.Second)
 	return &ActionResult{Success: true, Message: "启动应用成功"}, nil
 }
 
