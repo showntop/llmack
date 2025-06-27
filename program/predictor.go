@@ -9,6 +9,7 @@ import (
 
 // predictor ...
 type predictor struct {
+	Usage           llm.Usage
 	Mode            string
 	stream          bool
 	toolChoice      any

@@ -22,8 +22,9 @@ import (
 type MobileAgent struct {
 	Agent
 	// controller *controller.Controller
-	mobileController *adb.Controller
-	adbTool          *adb.AdbTool
+	mobileController  *adb.Controller
+	adbTool           *adb.AdbTool
+	TakeScreenshotURL func(ctx context.Context, adbTool *adb.AdbTool) (string, error)
 }
 
 // NewMobileAgent ...
@@ -176,7 +177,8 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 				newMessages = messages
 			}
 
-			screenshot, err := agent.adbTool.GetMobileCurrentScreenshot(ctx)
+			screenshotURL, err := agent.TakeScreenshotURL(ctx, agent.adbTool)
+			// screenshotURL, err := agent.adbTool.GetMobileCurrentScreenshotURL(ctx)
 			// screenshot, err := agent.adbTool.GetMobileCurrentScreenshotObject(ctx)
 			if err != nil {
 				log.ErrorContextf(ctx, "get mobile current screenshot error: %v", err)
@@ -203,10 +205,11 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 				// return newMessages
 			}
 			newMessages = append(newMessages, llm.NewUserMultipartMessage(
-				llm.MultipartContentImageBase64("png", screenshot),
+				// llm.MultipartContentImageBase64("png", screenshot),
 				// llm.MultipartContentCustom("venus_image_url", map[string]any{
 				// 	"venus_image_url": screenshot,
 				// }),
+				llm.MultipartContentImageURL(screenshotURL),
 				llm.MultipartContentText(fmt.Sprintf(`the image given above is the current screenshot of mobile with resolution 720x1280, you can use it to help you complete the task`)),
 				llm.MultipartContentText(fmt.Sprintf(`the current clickable elements: \n %s`, elementsJSON)),
 				llm.MultipartContentText(fmt.Sprintf(`the current phone state: \n %s`, stateJSON)),
@@ -217,13 +220,13 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 		// WithInputs(input).
 		WithTools(tools...).
 		WithStream(stream).
-		// WithToolChoice("auto").
-		WithToolChoice(map[string]any{
-			"type": "function",
-			"function": map[string]any{
-				"name": mobileToolName,
-			},
-		}).
+		WithToolChoice("auto").
+		// WithToolChoice(map[string]any{
+		// 	"type": "function",
+		// 	"function": map[string]any{
+		// 		"name": mobileToolName,
+		// 	},
+		// }).
 		InvokeWithMessages(ctx, initialMessages)
 	if predictor.Error() != nil {
 		agent.response.Error = predictor.Error()
@@ -235,6 +238,9 @@ func (agent *MobileAgent) retry(ctx context.Context, task string, stream bool) (
 		}
 	}
 	agent.response.Answer = predictor.Response().Completion()
+	agent.response.Usage.PromptTokens += predictor.Usage.PromptTokens
+	agent.response.Usage.CompletionTokens += predictor.Usage.CompletionTokens
+	agent.response.Usage.TotalTokens += predictor.Usage.TotalTokens
 	return agent.response, nil
 }
 
@@ -395,8 +401,8 @@ You are GUI agent for operating mobile phones. Your goal is to choose the correc
 
 使用中文回答。
 
-# attention
-如果 tap_by_index 没有达成任务，请使用 tap_by_coordinates 来完成任务。
-用 tap_by_coordinates 来进行区域筛选。
-	`
+# action usage attention
+1. 如果 tap_by_index 没有达成任务，请使用 tap_by_coordinates 来完成任务。
+2. 用 tap_by_coordinates 来进行区域筛选。
+`
 )

@@ -252,6 +252,9 @@ func (agent *Agent) retry(ctx context.Context, task string, stream bool) (*Agent
 		}
 	}
 	agent.response.Answer = predictor.Response().Completion()
+	agent.response.Usage.PromptTokens += predictor.Usage.PromptTokens
+	agent.response.Usage.CompletionTokens += predictor.Usage.CompletionTokens
+	agent.response.Usage.TotalTokens += predictor.Usage.TotalTokens
 	return agent.response, nil
 }
 

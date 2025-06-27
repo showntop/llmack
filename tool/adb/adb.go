@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/showntop/llmack/tool"
@@ -44,6 +43,17 @@ func (t *AdbTool) GetMobileCurrentScreenshot(ctx context.Context) ([]byte, error
 	}
 	fmt.Println("\n\nscreenshot path: ", localPath)
 	return os.ReadFile(localPath)
+}
+
+func (t *AdbTool) GetMobileCurrentScreenshotPath(ctx context.Context) (string, error) {
+	localPath, err := t.controller.TakeScreenshot(ctx, TakeScreenshotParams{
+		Quality: 100,
+	})
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("\n\nscreenshot path: ", localPath)
+	return localPath, nil
 }
 
 func (t *AdbTool) GetMobileCurrentScreenshotObject(ctx context.Context) (any, error) {
@@ -117,9 +127,42 @@ func (t *AdbTool) GetMobileCurrentPhoneState(ctx context.Context) (*PhoneState, 
 }
 
 func (t *AdbTool) DoActions(ctx context.Context, args string) (string, error) {
+	fmt.Println("do actions args: ", args)
 	var params ToolParams
 	if err := json.Unmarshal([]byte(args), &params); err != nil {
-		return "", err
+		// return "", err
+		// 先解析 action，
+		var paramMap map[string]any
+		if err := json.Unmarshal([]byte(args), &paramMap); err != nil {
+			return "", fmt.Errorf("parse answer error for not valid json (%w)", err)
+		}
+		fmt.Println("paramMap: ", paramMap)
+		if _, ok := paramMap["actions"].([]any); ok { // 如果 actions 是数组，则直接解析
+			actionsRaw, _ := json.Marshal(paramMap["actions"])
+			if err := json.Unmarshal(actionsRaw, &params.Actions); err != nil {
+				return "", fmt.Errorf("parse answer error for not valid json of actions field (%w)", err)
+			}
+		} else if actionsRaw, ok := paramMap["actions"].(string); ok { // 如果 actions 是对象，则直接解析
+			if err := json.Unmarshal([]byte(actionsRaw), &params.Actions); err != nil {
+				return "", fmt.Errorf("parse answer error for not valid json of actions field (%w)", err)
+			}
+		} else {
+			return "", fmt.Errorf("parse answer error for not valid json of actions field (%w)", err)
+		}
+
+		// 再解析 thought
+		if thoughtRaw, ok := paramMap["thought"].(string); ok {
+			if err := json.Unmarshal([]byte(thoughtRaw), params.Thought); err != nil {
+				return "", fmt.Errorf("parse answer error for not valid json of thought field (%w)", err)
+			}
+		} else if thoughtRaw, ok := paramMap["thought"].(map[string]any); ok {
+			thoughtRaw, _ := json.Marshal(thoughtRaw)
+			if err := json.Unmarshal(thoughtRaw, params.Thought); err != nil {
+				return "", fmt.Errorf("parse answer error for not valid json of thought field (%w)", err)
+			}
+		} else {
+			return "", fmt.Errorf("parse answer error for not valid json of thought field (%w)", err)
+		}
 	}
 	results := []string{}
 	for _, action := range params.Actions {
@@ -129,7 +172,6 @@ func (t *AdbTool) DoActions(ctx context.Context, args string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			time.Sleep(5 * time.Second) // sleep for wait completed.
 			result = "\n<" + name + "_result>\n" + result + "\n<" + name + "_result/>\n"
 			results = append(results, result)
 		}
