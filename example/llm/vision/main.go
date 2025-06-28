@@ -36,6 +36,8 @@ func main() {
 		panic(err)
 	}
 	for it := resp.Stream().Take(); it != nil; it = resp.Stream().Take() {
-		fmt.Println("final: ", it.Delta.Message)
+		if len(it.Choices) > 0 {
+			fmt.Println("final: ", it.Choices[0].Delta.String())
+		}
 	}
 }

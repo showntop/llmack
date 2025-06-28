@@ -30,7 +30,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	indexer.Index(ctx, mockDocuments(), &rag.Options{
+	indexer.Index(ctx, mockDocuments(), &rag.SearchOptions{
 		LibraryID:      1,
 		Kind:           "text",
 		IndexID:        1,
@@ -38,13 +38,7 @@ func main() {
 		ScoreThreshold: 0.5,
 	})
 
-	entities, err := indexer.Retrieve(ctx, "你好", &rag.Options{
-		LibraryID:      1,
-		Kind:           "text",
-		IndexID:        1,
-		TopK:           10,
-		ScoreThreshold: 0.5,
-	})
+	entities, err := indexer.Retrieve(ctx, "你好", rag.WithTopK(10), rag.WithScoreThreshold(0.5))
 	if err != nil {
 		panic(err)
 	}

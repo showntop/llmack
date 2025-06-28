@@ -61,7 +61,7 @@ func TestFuncall_Invokex(t *testing.T) {
 			p := FunCall()
 			p.model = mockModel
 
-			result := p.invoker.Invokex(context.Background(), tt.query)
+			result := p.invoker.Invoke(context.Background(), []llm.Message{}, tt.query, nil)
 
 			if tt.wantError {
 				assert.Error(t, result.reponse.err)
@@ -90,10 +90,14 @@ func TestFuncall_BuildTools(t *testing.T) {
 		assert.NotEmpty(t, tool.Function.Description)
 		assert.NotNil(t, tool.Function.Parameters)
 
-		properties := tool.Function.Parameters["properties"].(map[string]any)
+		// Type assert Parameters to map[string]any first
+		params, ok := tool.Function.Parameters.(map[string]any)
+		assert.True(t, ok, "Parameters should be map[string]any")
+
+		properties := params["properties"].(map[string]any)
 		assert.NotNil(t, properties)
 
-		required := tool.Function.Parameters["required"].([]string)
+		required := params["required"].([]string)
 		assert.NotNil(t, required)
 	}
 }

@@ -36,7 +36,7 @@ func main() {
 	// 示例3: 连接到文件系统MCP服务器
 	fmt.Println("\n3. 连接到文件系统MCP服务器:")
 	connectFileSystemServer(ctx)
-	return
+
 	// 示例4: 连接到SQLite MCP服务器
 	fmt.Println("\n4. 连接到SQLite MCP服务器:")
 	connectSQLiteServer(ctx)

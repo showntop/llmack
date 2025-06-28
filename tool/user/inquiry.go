@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/showntop/llmack/tool"
@@ -10,22 +11,29 @@ import (
 const Inquery = "Inquery"
 
 func init() {
-	t := &tool.Tool{}
-	t.Name = Inquery
-	t.Kind = "code"
-	t.Description = "询问用户的具体需求以提供个性化的服务"
-	t.Parameters = append(t.Parameters, tool.Parameter{
-		Name:        "inquiry",
-		Description: "询问用户的具体需求以提供个性化的服务",
-		Required:    true,
-		Type:        "string",
-	})
-	t.Invoke = func(ctx context.Context, args map[string]any) (string, error) {
-		// 等待用户输入
-		var input string
-		fmt.Println("请根据提示输入你的需求:")
-		fmt.Scanf("%s", &input)
-		return input, nil
-	}
+	t := tool.New(
+		tool.WithName(Inquery),
+		tool.WithKind("code"),
+		tool.WithDescription("询问用户的具体需求以提供个性化的服务"),
+		tool.WithParameters(tool.Parameter{
+			Name:          "inquiry",
+			LLMDescrition: "询问用户的具体需求以提供个性化的服务",
+			Required:      true,
+			Type:          tool.String,
+		}),
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			var params struct {
+				Inquiry string `json:"inquiry"`
+			}
+			if err := json.Unmarshal([]byte(args), &params); err != nil {
+				return "", err
+			}
+			// 等待用户输入
+			var input string
+			fmt.Printf("请根据提示输入你的需求 (%s): ", params.Inquiry)
+			fmt.Scanf("%s", &input)
+			return input, nil
+		}),
+	)
 	tool.Register(t)
 }

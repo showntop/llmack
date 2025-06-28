@@ -18,7 +18,7 @@ import (
 	"os"
 	"time"
 
-	appiumgo "appium-go"
+	appiumgo "github.com/showntop/llmack/pkg/appium"
 )
 
 func main() {
@@ -92,8 +92,6 @@ func demoBasicUsage() {
 	if err := driver.Tap([]appiumgo.Position{{X: 166, Y: 1983}}, 1); err != nil {
 		log.Printf("❌ 点击失败: %v", err)
 	}
-
-	return
 
 	// 模拟启动会话（在实际环境中需要Appium服务器）
 	fmt.Println("尝试启动会话...")

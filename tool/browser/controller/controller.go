@@ -409,7 +409,7 @@ func (c *Controller) ExtractContent(ctx context.Context, params ExtractContentAc
 		actionResult.ExtractedContent = &msg
 		return actionResult, nil
 	}
-	msg := fmt.Sprintf("📄  Extracted from page\n: %s\n", output)
+	msg := fmt.Sprintf("📄  Extracted from page\n: %s\n", output.Result().Message.Content())
 	log.Debug(msg)
 	actionResult := NewActionResult()
 	actionResult.ExtractedContent = &msg

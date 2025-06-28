@@ -7,16 +7,16 @@ import (
 	"github.com/showntop/llmack/tool"
 )
 
-const GetDate = "GetDate"
+const GetTime = "GetTime"
 
 func init() {
-	t := &tool.Tool{}
-	t.Name = "GetDate"
-	t.Kind = "code"
-	t.Description = "查询当前（今天）日期"
-	t.Parameters = append(t.Parameters, tool.Parameter{})
-	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
-		return time.Now().Format("2006-01-02"), nil
-	}
+	t := tool.New(
+		tool.WithName(GetTime),
+		tool.WithKind("code"),
+		tool.WithDescription("获取当前时间"),
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			return time.Now().Format("2006-01-02 15:04:05"), nil
+		}),
+	)
 	tool.Register(t)
 }

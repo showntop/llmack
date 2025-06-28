@@ -32,7 +32,7 @@ func main() {
 	fmt.Println(len(chunks))
 	for i := 0; i < len(chunks); i++ {
 		fmt.Println("--------------------")
-		fmt.Printf(pstrings.TrimSpecial(chunks[i]))
+		fmt.Printf("%s\n", pstrings.TrimSpecial(chunks[i]))
 		fmt.Println(len([]rune(pstrings.TrimSpecial(chunks[i]))))
 	}
 }

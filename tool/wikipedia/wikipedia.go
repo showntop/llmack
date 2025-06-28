@@ -2,6 +2,7 @@ package wikipedia
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/showntop/llmack/tool"
@@ -9,14 +10,16 @@ import (
 )
 
 func init() {
-	t := tool.CodeTool{}
-	t.Meta.Name = "wikipedia_search"
-	t.Meta.Description = "A tool for performing a Wikipedia search and extracting snippets and webpages. Input should be a search query."
-	t.Meta.Parameters = append(t.Meta.Parameters, tool.Parameter{
-		Name: "query", Type: tool.String, Required: true, LLMDescrition: `key words for searching, this should be in the language of "language" parameter`,
-		Options: []string{"de", "en", "fr", "hi", "ja", "ko", "pl", "pt", "ro", "uk", "vi", "zh"},
-	}, tool.Parameter{
-		Name: "language", Type: tool.String, Required: true, LLMDescrition: `
+	t := tool.New(
+		tool.WithName("wikipedia_search"),
+		tool.WithKind("code"),
+		tool.WithDescription("A tool for performing a Wikipedia search and extracting snippets and webpages. Input should be a search query."),
+		tool.WithParameters(
+			tool.Parameter{
+				Name: "query", Type: tool.String, Required: true, LLMDescrition: `key words for searching, this should be in the language of "language" parameter`,
+			},
+			tool.Parameter{
+				Name: "language", Type: tool.String, Required: true, LLMDescrition: `
 		language of the wikipedia to be searched,
 		only "de" for German,
 		"en" for English,
@@ -31,40 +34,49 @@ func init() {
 		"vi" for Vietnamese,
 		and "zh" for Chinese are supported
 		`,
-	})
-	t.Invokex = Invoke
-	tool.Register(t.Name(), &t)
+				Options: []string{"de", "en", "fr", "hi", "ja", "ko", "pl", "pt", "ro", "uk", "vi", "zh"},
+			},
+		),
+		tool.WithFunction(Invoke),
+	)
+	tool.Register(t)
 }
 
 // Invoke ...
-// func Invoke(ctx context.Context, args map[string]any) interface{} {
-func Invoke(ctx context.Context, args map[string]any) (string, error) {
-	query, _ := args["query"].(string)
-	lang, _ := args["language"].(string)
-	if query == "" {
+func Invoke(ctx context.Context, args string) (string, error) {
+	var params struct {
+		Query    string `json:"query"`
+		Language string `json:"language"`
+	}
+	if err := json.Unmarshal([]byte(args), &params); err != nil {
+		return "", err
+	}
+
+	if params.Query == "" {
 		return "Please input query", fmt.Errorf("query is empty")
 	}
-	_ = lang
 
 	// Search for the Wikipedia page title
-	searchResult, _, err := gowiki.Search("Why is the sky blue", 3, false)
+	searchResult, _, err := gowiki.Search(params.Query, 3, false)
 	if err != nil {
-		fmt.Println(err)
+		return "", fmt.Errorf("search failed: %v", err)
 	}
-	fmt.Printf("This is your search result: %v\n", searchResult)
 
-	// Get the page
-	page, err := gowiki.GetPage("Rafael Nadal", -1, false, true)
+	if len(searchResult) == 0 {
+		return "No search results found", nil
+	}
+
+	// Get the first page
+	page, err := gowiki.GetPage(searchResult[0], -1, false, true)
 	if err != nil {
-		fmt.Println(err)
+		return "", fmt.Errorf("failed to get page: %v", err)
 	}
 
 	// Get the content of the page
 	content, err := page.GetContent()
 	if err != nil {
-		fmt.Println(err)
+		return "", fmt.Errorf("failed to get content: %v", err)
 	}
-	fmt.Printf("This is the page content: %v\n", content)
 
 	return content, nil
 }

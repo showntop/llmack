@@ -9,15 +9,16 @@ import (
 const QueryWeather = "QueryWeather"
 
 func init() {
-	t := &tool.Tool{}
-	t.Name = QueryWeather
-	t.Kind = "code"
-	t.Description = "查询天气"
-	t.Parameters = append(t.Parameters, tool.Parameter{
-		Name: "city", Type: tool.String, Required: true, LLMDescrition: "城市", Default: "北京",
-	})
-	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
-		return "北京晴朗，北风三级，2-15 摄氏度，空气质量优。", nil
-	}
+	t := tool.New(
+		tool.WithName(QueryWeather),
+		tool.WithKind("code"),
+		tool.WithDescription("查询天气"),
+		tool.WithParameters(tool.Parameter{
+			Name: "city", Type: tool.String, Required: true, LLMDescrition: "城市", Default: "北京",
+		}),
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			return "北京晴朗，北风三级，2-15 摄氏度，空气质量优。", nil
+		}),
+	)
 	tool.Register(t)
 }

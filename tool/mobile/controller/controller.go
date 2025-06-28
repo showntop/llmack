@@ -69,7 +69,6 @@ type LaunchAppAction struct {
 
 func (c *Controller) LaunchApp(ctx context.Context, params LaunchAppAction) (*ActionResult, error) {
 	panic("not implemented")
-	return NewActionResult(), nil
 }
 
 type TapByCoordinatesAction struct {

@@ -1,4 +1,4 @@
-package main
+package chunk_test
 
 import (
 	"fmt"

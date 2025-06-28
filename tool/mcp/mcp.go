@@ -279,9 +279,6 @@ func handleConnect(params map[string]interface{}) (string, error) {
 		responseJSON, _ := json.MarshalIndent(response, "", "  ")
 		return string(responseJSON), nil
 	}
-
-	// This code should never be reached now
-	return "", fmt.Errorf("unexpected code path")
 }
 
 func handleDisconnect(params map[string]interface{}) (string, error) {

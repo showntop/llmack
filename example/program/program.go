@@ -70,18 +70,19 @@ func getWeather() string {
 }
 
 func getCalculator() string {
-	calculator := &tool.Tool{}
-	calculator.Name = "calculator"
-	calculator.Kind = "code"
-	calculator.Description = "Use this function to calculate the result of the user's question."
-	calculator.Parameters = append(calculator.Parameters, tool.Parameter{
-		Name:          "question",
-		Type:          "string",
-		LLMDescrition: "The user's question to calculate the result.",
-	})
-	calculator.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
-		return "2", nil
-	}
+	calculator := tool.New(
+		tool.WithName("calculator"),
+		tool.WithKind("code"),
+		tool.WithDescription("Use this function to calculate the result of the user's question."),
+		tool.WithParameters(tool.Parameter{
+			Name:          "question",
+			Type:          tool.String,
+			LLMDescrition: "The user's question to calculate the result.",
+		}),
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			return "2", nil
+		}),
+	)
 
 	tool.Register(calculator)
 	return calculator.Name

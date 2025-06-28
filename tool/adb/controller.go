@@ -273,7 +273,7 @@ func (t *Controller) TapByIndex(ctx context.Context, params TapByIndexParams) (*
 	// 解析边界并计算中心点
 	x, y, err := t.parseBounds(element.Bounds)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("解析元素边界失败: %v", err)}, fmt.Errorf("解析元素边界失败: %v", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("解析元素边界失败: %v", err)}, fmt.Errorf("解析元素边界失败: %w", err)
 	}
 
 	return t.TapByCoordinates(ctx, TapByCoordinatesParams{X: x, Y: y})
@@ -323,11 +323,11 @@ type TapByCoordinatesParams struct {
 func (t *Controller) TapByCoordinates(ctx context.Context, params TapByCoordinatesParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %v", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
 	if err := device.Tap(ctx, params.X, params.Y); err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("点击失败: %v", err)}, fmt.Errorf("点击失败: %v", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("点击失败: %v", err)}, fmt.Errorf("点击失败: %w", err)
 	}
 	// time.sleep
 	time.Sleep(5 * time.Second)
@@ -346,11 +346,11 @@ type SwipeParams struct {
 func (t *Controller) Swipe(ctx context.Context, params SwipeParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
 	if err := device.Swipe(ctx, params.StartX, params.StartY, params.EndX, params.EndY, params.DurationMs); err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("滑动失败: %w", err)}, fmt.Errorf("滑动失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("滑动失败: %v", err)}, fmt.Errorf("滑动失败: %w", err)
 	}
 	time.Sleep(5 * time.Second)
 	return &ActionResult{Success: true, Message: "滑动成功"}, nil
@@ -364,11 +364,11 @@ type InputTextParams struct {
 func (t *Controller) InputText(ctx context.Context, params InputTextParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
 	if err := device.InputText(ctx, params.Text); err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("输入失败: %w", err)}, fmt.Errorf("输入失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("输入失败: %v", err)}, fmt.Errorf("输入失败: %w", err)
 	}
 	time.Sleep(3 * time.Second)
 
@@ -383,11 +383,11 @@ type PressKeyParams struct {
 func (t *Controller) PressKey(ctx context.Context, params PressKeyParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
 	if err := device.PressKey(ctx, params.Keycode); err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("按键失败: %w", err)}, fmt.Errorf("按键失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("按键失败: %v", err)}, fmt.Errorf("按键失败: %w", err)
 	}
 	time.Sleep(3 * time.Second)
 
@@ -403,11 +403,11 @@ type StartAppParams struct {
 func (t *Controller) StartApp(ctx context.Context, params StartAppParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
 	if err := device.StartApp(ctx, params.Pkg, params.Activity); err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("启动应用失败: %w", err)}, fmt.Errorf("启动应用失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("启动应用失败: %v", err)}, fmt.Errorf("启动应用失败: %w", err)
 	}
 	time.Sleep(10 * time.Second)
 	return &ActionResult{Success: true, Message: "启动应用成功"}, nil
@@ -423,11 +423,11 @@ type InstallAppParams struct {
 func (t *Controller) InstallApp(ctx context.Context, params InstallAppParams) (*ActionResult, error) {
 	device, err := t.GetDevice(ctx)
 	if err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %w", err)}, fmt.Errorf("获取设备失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("获取设备失败: %v", err)}, fmt.Errorf("获取设备失败: %w", err)
 	}
 
 	if err := device.InstallApp(ctx, params.ApkPath, params.Reinstall, params.GrantPermissions); err != nil {
-		return &ActionResult{Success: false, Message: fmt.Sprintf("安装应用失败: %w", err)}, fmt.Errorf("安装应用失败: %w", err)
+		return &ActionResult{Success: false, Message: fmt.Sprintf("安装应用失败: %v", err)}, fmt.Errorf("安装应用失败: %w", err)
 	}
 
 	return &ActionResult{Success: true, Message: "安装应用成功"}, nil

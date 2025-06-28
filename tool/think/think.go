@@ -1,7 +1,8 @@
-package weather
+package think
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/showntop/llmack/tool"
 )
@@ -9,18 +10,28 @@ import (
 const Think = "ThinkTool"
 
 func init() {
-	t := &tool.Tool{}
-	t.Name = Think
-	t.Kind = "code"
-	t.Description = "Intelligent problem-solving assistant that comprehends tasks, identifies key variables, and makes efficient decisions, all while providing detailed, self-driven reasoning for its choices. Do not assume anything, take the details from given data only."
-	t.Parameters = append(t.Parameters, tool.Parameter{
-		Name: "task", Type: tool.String, Required: true,
-		LLMDescrition: "Task description which needs reasoning.",
-		Default:       "",
-	})
-	t.Invokex = func(ctx context.Context, args map[string]any) (string, error) {
-		return "北京晴朗，北风三级，2-15 摄氏度，空气质量优。", nil
-	}
+	t := tool.New(
+		tool.WithName(Think),
+		tool.WithKind("code"),
+		tool.WithDescription("Intelligent problem-solving assistant that comprehends tasks, identifies key variables, and makes efficient decisions, all while providing detailed, self-driven reasoning for its choices. Do not assume anything, take the details from given data only."),
+		tool.WithParameters(tool.Parameter{
+			Name:          "task",
+			Type:          tool.String,
+			Required:      true,
+			LLMDescrition: "Task description which needs reasoning.",
+			Default:       "",
+		}),
+		tool.WithFunction(func(ctx context.Context, args string) (string, error) {
+			var params struct {
+				Task string `json:"task"`
+			}
+			if err := json.Unmarshal([]byte(args), &params); err != nil {
+				return "", err
+			}
+			// TODO: Implement actual thinking logic
+			return "任务分析：" + params.Task + "。基于现有信息进行推理分析...", nil
+		}),
+	)
 	tool.Register(t)
 }
 

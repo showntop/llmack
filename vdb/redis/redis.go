@@ -59,15 +59,21 @@ func New(config any) (vdb.VDB, error) {
 	return db, nil
 }
 
-func (r *VDB) Store(ctx context.Context, docs []*vdb.Document) error {
+func (r *VDB) Create(ctx context.Context) error {
+	// 确保索引存在 (在redis中，这相当于创建VDB)
+	return r.ensureIndex(ctx)
+}
+
+func (r *VDB) Store(ctx context.Context, docs ...*vdb.Document) error {
 	for _, doc := range docs {
-		return r.client.Do(ctx, "HSET", r.index, doc.ID, doc.Metadata).Err()
+		if err := r.client.Do(ctx, "HSET", r.index, doc.ID, doc.Metadata).Err(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOption) ([]vdb.Document, error) {
-
+func (r *VDB) Search(ctx context.Context, vector []float32, opts ...vdb.SearchOption) ([]*vdb.Document, error) {
 	// 应用搜索选项
 	options := &vdb.SearchOptions{
 		TopK:      10,
@@ -77,12 +83,18 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 		opt(options)
 	}
 
+	// 将float32转换为float64
+	vector64 := make([]float64, len(vector))
+	for i, v := range vector {
+		vector64[i] = float64(v)
+	}
+
 	// 构建向量搜索查询
 	query := fmt.Sprintf("*=>[KNN %d @vector $BLOB AS score]", options.TopK)
 
 	// 执行搜索
 	res := r.client.Do(ctx, "FT.SEARCH", r.index, query,
-		"PARAMS", "2", "BLOB", vectorToBytes(vector),
+		"PARAMS", "2", "BLOB", vectorToBytes(vector64),
 		"RETURN", "4", "id", "query", "answer", "score",
 		"LIMIT", "0", strconv.Itoa(options.TopK),
 	)
@@ -97,7 +109,7 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 		return nil, fmt.Errorf("parse results: %w", err)
 	}
 
-	var docs []vdb.Document
+	var docs []*vdb.Document
 	// Redis 返回格式: [total_results doc1_id doc1_fields... doc2_id doc2_fields...]
 	for i := 1; i < len(results); i += 2 {
 		fields := results[i+1].([]interface{})
@@ -105,7 +117,7 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 
 		if score > options.Threshold {
 			id, _ := strconv.ParseInt(fields[1].(string), 10, 64)
-			docs = append(docs, vdb.Document{
+			docs = append(docs, &vdb.Document{
 				ID:       strconv.FormatInt(id, 10),
 				Title:    fields[3].(string),
 				Metadata: fields[5].(map[string]any),
@@ -116,13 +128,31 @@ func (r *VDB) Search(ctx context.Context, vector []float64, opts ...vdb.SearchOp
 	return docs, nil
 }
 
-func (r *VDB) SearchQuery(ctx context.Context, query string, opts ...vdb.SearchOption) ([]vdb.Document, error) {
+func (r *VDB) SearchWithOptions(ctx context.Context, vector []float32, options *vdb.SearchOptions) ([]*vdb.Document, error) {
+	return r.Search(ctx, vector, func(opts *vdb.SearchOptions) {
+		*opts = *options
+	})
+}
+
+func (r *VDB) SearchQuery(ctx context.Context, query string, opts ...vdb.SearchOption) ([]*vdb.Document, error) {
 	vector, err := r.textToVector(query)
 	if err != nil {
 		return nil, fmt.Errorf("convert query to vector: %w", err)
 	}
 
-	return r.Search(ctx, vector, opts...)
+	// 将float64转换为float32
+	vector32 := make([]float32, len(vector))
+	for i, v := range vector {
+		vector32[i] = float32(v)
+	}
+
+	return r.Search(ctx, vector32, opts...)
+}
+
+func (r *VDB) SearchQueryWithOptions(ctx context.Context, query string, options *vdb.SearchOptions) ([]*vdb.Document, error) {
+	return r.SearchQuery(ctx, query, func(opts *vdb.SearchOptions) {
+		*opts = *options
+	})
 }
 
 func (r *VDB) Delete(ctx context.Context, id string) error {

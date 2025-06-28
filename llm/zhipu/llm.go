@@ -2,6 +2,7 @@ package zhipu
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/openai/openai-go"
@@ -47,12 +48,16 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.Invo
 					Type: m.Type,
 				}
 				if m.Type == "image_url" {
-					part.ImageURL = &zhipu.URLItem{
-						URL: m.Data,
+					if url, ok := m.Data.(string); ok {
+						part.ImageURL = &zhipu.URLItem{
+							URL: url,
+						}
 					}
 				}
 				if m.Type == "text" {
-					part.Text = m.Data
+					if text, ok := m.Data.(string); ok {
+						part.Text = text
+					}
 				}
 				contents = append(contents, part)
 			}
@@ -64,10 +69,24 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.Invo
 	}
 	var internalTools []zhipu.ChatCompletionTool
 	for _, t := range opts.Tools {
+		params, ok := t.Function.Parameters.(openai.FunctionParameters)
+		if !ok {
+			// 如果类型断言失败，尝试通过JSON序列化/反序列化转换
+			paramsBytes, err := json.Marshal(t.Function.Parameters)
+			if err != nil {
+				continue
+			}
+			var convertedParams openai.FunctionParameters
+			if err := json.Unmarshal(paramsBytes, &convertedParams); err != nil {
+				continue
+			}
+			params = convertedParams
+		}
+
 		internalTools = append(internalTools, zhipu.ChatCompletionToolFunction{
 			Name:        t.Function.Name,
 			Description: t.Function.Description,
-			Parameters:  openai.FunctionParameters(t.Function.Parameters),
+			Parameters:  params,
 		})
 	}
 	service := m.client.

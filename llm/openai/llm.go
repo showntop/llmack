@@ -48,12 +48,26 @@ func (m *LLM) Invoke(ctx context.Context, messages []llm.Message, opts *llm.Invo
 
 	var toolsOpenAI []openai.ChatCompletionToolParam
 	for _, t := range opts.Tools {
+		params, ok := t.Function.Parameters.(openai.FunctionParameters)
+		if !ok {
+			// 如果类型断言失败，尝试通过JSON序列化/反序列化转换
+			paramsBytes, err := json.Marshal(t.Function.Parameters)
+			if err != nil {
+				continue
+			}
+			var convertedParams openai.FunctionParameters
+			if err := json.Unmarshal(paramsBytes, &convertedParams); err != nil {
+				continue
+			}
+			params = convertedParams
+		}
+
 		toolsOpenAI = append(toolsOpenAI, openai.ChatCompletionToolParam{
 			Type: openai.F(openai.ChatCompletionToolTypeFunction),
 			Function: openai.F(openai.FunctionDefinitionParam{
 				Name:        openai.F(t.Function.Name),
 				Description: openai.F(t.Function.Description),
-				Parameters:  openai.F(openai.FunctionParameters(t.Function.Parameters)),
+				Parameters:  openai.F(params),
 			}),
 		})
 	}
