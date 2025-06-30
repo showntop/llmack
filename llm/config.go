@@ -12,8 +12,8 @@ type ConfigSupplier interface {
 // ConfigSupplierFunc ...
 type ConfigSupplierFunc func(key string) any
 
-// WithConfigSupplier ...
-func WithConfigSupplier(c ConfigSupplier) {
+// SetConfigSupplier ...
+func SetConfigSupplier(c ConfigSupplier) {
 	Config = c
 }
 
@@ -29,8 +29,8 @@ func (c *envConfig) Get(key string) any {
 	return os.Getenv(key)
 }
 
-// WithConfigs ...
-func WithConfigs(c map[string]any) {
+// SetConfigs ...
+func SetConfigs(c map[string]any) {
 	Config = &mapConfig{Value: c}
 }
 
@@ -43,8 +43,8 @@ func (c *mapConfig) Get(key string) any {
 	return c.Value[key]
 }
 
-// WithSingleConfig ...
-func WithSingleConfig(c any) {
+// SetSingleConfig ...
+func SetSingleConfig(c any) {
 	Config = &anyConfig{Value: c}
 }
 

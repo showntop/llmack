@@ -17,12 +17,12 @@ func init() {
 func main() {
 	ctx := context.Background()
 
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"base_url": os.Getenv("hunyuan_base_url"),
 		"api_key":  os.Getenv("hunyuan_api_key"),
 	})
 
-	resp, err := llm.NewInstance(openaic.Name).Invoke(ctx, []llm.Message{
+	resp, err := llm.New(openaic.Name).Invoke(ctx, []llm.Message{
 		llm.NewUserMultipartMessage(
 			llm.MultipartContentImageURL("https://img.tukuppt.com/bg_grid/05/37/54/v40ZCaqERa.jpg!/fh/350"),
 			llm.MultipartContentText("给这张图片添加一个太阳"),

@@ -39,7 +39,7 @@ func NewTeam(mode TeamMode, opts ...Option) *Team {
 		opt(team)
 	}
 	if team.llm == nil {
-		team.llm = llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-v3")) // default model
+		team.llm = llm.New(deepseek.Name, llm.WithDefaultModel("deepseek-v3")) // default model
 	}
 	return team
 }

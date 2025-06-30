@@ -17,7 +17,7 @@ func WithAdapter(adapter Adapter) option {
 func WithLLM(provider string, model string, opts ...llm.Option) option {
 	return func(p *predictor) {
 		opts = append(opts, llm.WithDefaultModel(model))
-		p.model = llm.NewInstance(provider, opts...)
+		p.model = llm.New(provider, opts...)
 	}
 }
 

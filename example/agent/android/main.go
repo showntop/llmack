@@ -20,7 +20,7 @@ func init() {
 
 	log.SetLogger(&mlog{})
 
-	llm.WithConfigs(map[string]any{
+	llm.SetConfigs(map[string]any{
 		"doubao": map[string]any{
 			"base_url": "https://ark.cn-beijing.volces.com/api/v3",
 			"api_key":  os.Getenv("doubao_api_key"),
@@ -61,7 +61,7 @@ func initAndroid() {
 	// adb shell ime set com.android.adbkeyboard/.AdbIME
 }
 
-var claudeModel = llm.NewInstance(openaic.Name,
+var claudeModel = llm.New(openaic.Name,
 	llm.WithDefaultModel("claude-3-7-sonnet-20250219"),
 	llm.WithInvokeOptions(&llm.InvokeOptions{
 		Metadata: map[string]any{

@@ -98,8 +98,8 @@ func WithLogger(l logger) Option {
 	}
 }
 
-// NewInstance ...
-func NewInstance(provider string, opts ...Option) *Instance {
+// New ...
+func New(provider string, opts ...Option) *Instance {
 	var options Options = Options{
 		logger: &NoneLogger{},
 	}

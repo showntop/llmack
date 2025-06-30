@@ -23,12 +23,12 @@ func main() {
 func runWithCache() {
 	ctx := context.Background()
 
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"base_url": os.Getenv("hunyuan_base_url"),
 		"api_key":  os.Getenv("hunyuan_api_key"),
 	})
 
-	instance := llm.NewInstance(openaic.Name,
+	instance := llm.New(openaic.Name,
 		llm.WithCache(llm.NewMemoCache()),
 		llm.WithLogger(&log.WrapLogger{}),
 	)

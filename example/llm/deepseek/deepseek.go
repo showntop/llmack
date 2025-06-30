@@ -18,17 +18,21 @@ func init() {
 
 func main() {
 	ctx := context.Background()
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"api_key": os.Getenv("deepseek_api_key"),
 		// "api_key":  os.Getenv("deepseek_api_key2"),
 		// "base_url": "https://api.lkeap.cloud.tencent.com/v1",
 	})
 
-	resp, err := llm.NewInstance(deepseek.Name).Invoke(ctx,
+	resp, err := llm.New(deepseek.Name).Invoke(ctx,
 		// []llm.Message{llm.UserPromptMessage("Prove that all entire functions that are also injective take the form f (z) = az + 6 with a, b € C, and a ‡ 0.")},
 		[]llm.Message{llm.NewUserTextMessage("你好")},
+		llm.WithModel("deepseek-chat"),
 		llm.WithStream(true),
-		llm.WithModel("deepseek-chat"))
+		llm.WithStreamOptions(&llm.StreamOptions{
+			IncludeUsage: true,
+		}),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -38,4 +42,5 @@ func main() {
 		fmt.Println(string(xxx))
 		// fmt.Println("final: ", it.Delta.Message)
 	}
+	fmt.Println("final: ", resp.Result().Usage)
 }

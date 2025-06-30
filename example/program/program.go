@@ -20,7 +20,7 @@ func init() {
 
 	log.SetLogger(&log.WrapLogger{})
 
-	llm.WithConfigs(map[string]any{
+	llm.SetConfigs(map[string]any{
 		deepseek.Name: map[string]any{
 			"api_key": os.Getenv("deepseek_api_key"),
 		},

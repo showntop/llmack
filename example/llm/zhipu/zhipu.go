@@ -17,11 +17,11 @@ func init() {
 
 func main() {
 	ctx := context.Background()
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"api_key": os.Getenv("zhipu_api_key"),
 	})
 
-	resp, err := llm.NewInstance(zhipu.Name).Invoke(ctx,
+	resp, err := llm.New(zhipu.Name).Invoke(ctx,
 		[]llm.Message{
 			// llm.UserTextPromptMessage("你好"),
 			llm.NewUserMultipartMessage(

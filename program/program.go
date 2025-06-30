@@ -10,11 +10,11 @@ import (
 // var defaultLLM = llm.NewInstance(moonshot.Name, llm.WithDefaultModel("moonshot-v1-8k"))
 // var defaultLLM = llm.NewInstance(hunyuan.Name, llm.WithDefaultModel("hunyuan"))
 // var defaultLLM = llm.NewInstance(zhipu.Name, llm.WithDefaultModel("GLM-4-Flash"))
-var defaultLLM = llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))
+var defaultLLM = llm.New(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))
 
 // SetLLM can not set concurrent
 func SetLLM(provider, model string) {
-	defaultLLM = llm.NewInstance(provider, llm.WithDefaultModel(model))
+	defaultLLM = llm.New(provider, llm.WithDefaultModel(model))
 }
 
 // Program defines the interface for a program

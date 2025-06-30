@@ -55,7 +55,7 @@ func TestFuncall_Invokex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockModel := llm.NewInstance(llm.MockLLMModelName)
+			mockModel := llm.New(llm.MockLLMModelName)
 			tt.setupMocks(mockModel)
 
 			p := FunCall()

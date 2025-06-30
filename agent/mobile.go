@@ -296,7 +296,7 @@ func (agent *MobileAgent) getInitialMessages(ctx context.Context, task string) [
 }
 
 func (agent *MobileAgent) getLayoutAndCoordinates() string {
-	model := llm.NewInstance(doubao.Name, llm.WithDefaultModel("doubao-1-5-ui-tars-250428"))
+	model := llm.New(doubao.Name, llm.WithDefaultModel("doubao-1-5-ui-tars-250428"))
 	function := func(ctx context.Context, args string) (string, error) {
 		// screenshot := agent.mobile.GetCurrentScreenshot(ctx)
 		// TODO: get layout and coordinates

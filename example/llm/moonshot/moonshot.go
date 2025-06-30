@@ -17,11 +17,11 @@ func init() {
 
 func main() {
 	ctx := context.Background()
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"api_key": os.Getenv("moonshot_api_key"),
 	})
 
-	resp, err := llm.NewInstance(moonshot.Name).Invoke(ctx, []llm.Message{
+	resp, err := llm.New(moonshot.Name).Invoke(ctx, []llm.Message{
 		llm.NewUserTextMessage("你好"),
 	}, llm.WithModel("moonshot-v1-8k"))
 	if err != nil {

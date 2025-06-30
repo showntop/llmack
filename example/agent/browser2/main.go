@@ -22,7 +22,7 @@ func init() {
 	// llm.WithSingleConfig(map[string]any{
 	// 	"api_key": os.Getenv("qwen_api_key"),
 	// })
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"api_key": os.Getenv("deepseek_api_key"),
 	})
 }
@@ -41,7 +41,7 @@ func main() {
 	browserAgent := agent.NewAgent("General AI Agent",
 		agent.WithDescription("You are an expert AI assistant optimized for solving complex real-world tasks that require reasoning, research, and sophisticated tool utilization. You have been specifically trained to provide precise, accurate answers to questions across a wide range of domains."),
 		// agent.WithModel(llm.NewInstance(qwen.Name, llm.WithDefaultModel("qwen-vl-max-latest"))),
-		agent.WithModel(llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))),
+		agent.WithModel(llm.New(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))),
 		agent.WithInstructions(capability, rules, answerFormat),
 		agent.WithTools(tools...),
 	)

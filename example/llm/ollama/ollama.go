@@ -17,11 +17,11 @@ func main() {
 	// 	},
 	// })
 
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"base_url": "http://127.0.0.1:11434",
 	})
 
-	resp, err := llm.NewInstance("ollama").Invoke(ctx, []llm.Message{
+	resp, err := llm.New("ollama").Invoke(ctx, []llm.Message{
 		llm.NewUserTextMessage("你好"),
 	}, llm.WithModel("llama3.1"), llm.WithStream(true))
 	if err != nil {

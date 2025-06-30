@@ -23,11 +23,11 @@ func main() {
 func runWithCache() {
 	ctx := context.Background()
 
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"api_key": os.Getenv("qwen_api_key"),
 	})
 
-	instance := llm.NewInstance(qwen.Name,
+	instance := llm.New(qwen.Name,
 		llm.WithCache(llm.NewMemoCache()),
 		llm.WithLogger(&log.WrapLogger{}),
 	)

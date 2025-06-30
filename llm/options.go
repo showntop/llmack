@@ -206,6 +206,12 @@ func WithToolChoice(toolChoice any) InvokeOption {
 	}
 }
 
+func WithStreamOptions(streamOptions *StreamOptions) InvokeOption {
+	return func(o *InvokeOptions) {
+		o.StreamOptions = streamOptions
+	}
+}
+
 // WithMetadata specifies the metadata for the request.
 func WithMetadata(metadata map[string]any) InvokeOption {
 	return func(o *InvokeOptions) {

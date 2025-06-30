@@ -18,12 +18,14 @@ func init() {
 
 func main() {
 	ctx := context.Background()
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"api_key":  os.Getenv("claude_api_key"),
-		"base_url": "http://v2.open.venus.oa.com/llmproxy",
+		"base_url": "http://venus.oa.com/llmproxy",
 	})
 
-	resp, err := llm.NewInstance(anthropic.Name).Invoke(ctx,
+	model := llm.New(anthropic.Name, llm.WithBaseURL("http://v2.open.venus.oa.com/llmproxy"), llm.WithAPIKey(os.Getenv("claude_api_key")))
+
+	resp, err := model.Invoke(ctx,
 		// []llm.Message{llm.UserPromptMessage("Prove that all entire functions that are also injective take the form f (z) = az + 6 with a, b € C, and a ‡ 0.")},
 		[]llm.Message{llm.NewUserTextMessage("你好")},
 		llm.WithStream(true),

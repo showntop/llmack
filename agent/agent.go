@@ -58,7 +58,7 @@ func NewAgent(name string, options ...Option) *Agent {
 		option(agent)
 	}
 	if agent.llm == nil {
-		agent.llm = llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-v3")) // default model
+		agent.llm = llm.New(deepseek.Name, llm.WithDefaultModel("deepseek-v3")) // default model
 	}
 	return agent
 }

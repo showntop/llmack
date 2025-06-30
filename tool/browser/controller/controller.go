@@ -348,7 +348,7 @@ func (c *Controller) ExtractContent(ctx context.Context, params ExtractContentAc
 	if err != nil {
 		return nil, err
 	}
-	var llmInstance *llm.Instance = llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))
+	var llmInstance *llm.Instance = llm.New(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))
 	// if llm, ok := ctx.Value(pageExtractionLlmKey).(*llm.Instance); ok {
 	// 	llmInstance = llm
 	// } else {

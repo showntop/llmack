@@ -14,14 +14,14 @@ import (
 )
 
 var (
-	model = llm.NewInstance(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))
+	model = llm.New(deepseek.Name, llm.WithDefaultModel("deepseek-chat"))
 )
 
 func init() {
 	godotenv.Load()
 
 	log.SetLogger(&log.WrapLogger{})
-	llm.WithSingleConfig(map[string]any{
+	llm.SetSingleConfig(map[string]any{
 		"api_key": os.Getenv("deepseek_api_key"),
 	})
 }
