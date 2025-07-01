@@ -1,8 +1,23 @@
 package storage
 
-import "context"
+import (
+	"context"
+	"time"
+
+	"github.com/showntop/llmack/llm"
+)
+
+type Journey struct {
+	SessionID string
+	StepNo    int
+	Kind      string
+	Duration  time.Duration
+	Messages  []llm.Message
+	Metadata  any
+}
 
 type Storage interface {
+	AddNewJourney(ctx context.Context, journey *Journey) error
 	SaveSession(ctx context.Context, session *Session) error
 	FetchSession(ctx context.Context, id string) (*Session, error)
 	UpdateSession(ctx context.Context, session *Session) error

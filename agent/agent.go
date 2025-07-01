@@ -148,7 +148,7 @@ func (agent *Agent) invoke(ctx context.Context, task string, options *InvokeOpti
 		return agent.response, err
 	}
 
-	agent.SessionID = session.ID
+	agent.SessionID = session.UID
 	agent.session = session
 
 	defer func() { //  Update Agent Memory
@@ -156,7 +156,7 @@ func (agent *Agent) invoke(ctx context.Context, task string, options *InvokeOpti
 		log.DebugContextf(ctx, "===============================\n %s", agent.response.Answer)
 		log.DebugContextf(ctx, "===============================")
 		if agent.memory != nil {
-			agent.memory.Add(ctx, session.ID, memory.NewMemoryItem(session.ID, task, nil))
+			agent.memory.Add(ctx, session.UID, memory.NewMemoryItem(session.UID, task, nil))
 		}
 		if agent.storage != nil {
 			agent.storage.UpdateSession(ctx, session)
@@ -263,7 +263,7 @@ func (agent *Agent) fetchOrCreateSession(ctx context.Context, sessionID string) 
 	if sessionID == "" {
 		sessionID = uuid.NewString()
 		session := &storage.Session{
-			ID:         sessionID,
+			UID:        sessionID,
 			EngineID:   agent.ID,
 			EngineType: "agent" + "(" + agent.Name + ")",
 			EngineData: map[string]any{},
@@ -281,7 +281,7 @@ func (agent *Agent) fetchOrCreateSession(ctx context.Context, sessionID string) 
 
 	if agent.storage == nil { // no storage just in memory
 		return &storage.Session{
-			ID:         sessionID,
+			UID:        sessionID,
 			EngineID:   agent.ID,
 			EngineType: "agent" + "(" + agent.Name + ")",
 			EngineData: map[string]any{},

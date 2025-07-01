@@ -24,9 +24,13 @@ func NewJSONStorage(path string) Storage {
 	}
 }
 
+func (s *JSONStorage) AddNewJourney(ctx context.Context, journey *Journey) error {
+	panic("not implemented")
+}
+
 func (s *JSONStorage) SaveSession(ctx context.Context, session *Session) error {
 	// create file
-	filePath := filepath.Join(s.path, session.ID+".json")
+	filePath := filepath.Join(s.path, session.UID+".json")
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -45,7 +49,7 @@ func (s *JSONStorage) FetchSession(ctx context.Context, id string) (*Session, er
 			return nil, err
 		}
 		return &Session{
-			ID: id,
+			UID: id,
 		}, nil
 	}
 	file, err := os.Open(filePath)
@@ -61,7 +65,7 @@ func (s *JSONStorage) FetchSession(ctx context.Context, id string) (*Session, er
 
 	if len(content) == 0 {
 		return &Session{
-			ID: id,
+			UID: id,
 		}, nil
 	}
 
@@ -74,7 +78,7 @@ func (s *JSONStorage) FetchSession(ctx context.Context, id string) (*Session, er
 }
 
 func (s *JSONStorage) UpdateSession(ctx context.Context, session *Session) error {
-	filePath := filepath.Join(s.path, session.ID+".json")
+	filePath := filepath.Join(s.path, session.UID+".json")
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err

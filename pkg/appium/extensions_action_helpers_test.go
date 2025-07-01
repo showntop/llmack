@@ -121,7 +121,7 @@ func (m *mockWebDriver) Execute(command string, params map[string]interface{}) (
 // TestActionHelpers tests ActionHelpers creation
 func TestActionHelpers(t *testing.T) {
 	mockDriver := newMockWebDriver()
-
+	_ = mockDriver
 	driver := &WebDriver{}
 	// TODO: Fix test setup - driver.Execute assignment issue
 	// driver.Execute = mockDriver.Execute

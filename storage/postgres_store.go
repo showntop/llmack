@@ -47,6 +47,10 @@ func NewPostgresStorageWithGormDB(gormDB *gorm.DB) Storage {
 	}
 }
 
+func (s *PostgresStorage) AddNewJourney(ctx context.Context, journey *Journey) error {
+	return s.db.Create(journey).Error
+}
+
 func (s *PostgresStorage) SaveSession(ctx context.Context, session *Session) error {
 	return s.db.Create(session).Error
 }
