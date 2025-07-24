@@ -32,7 +32,9 @@ func (rp *funcall) InvokeOnce(ctx context.Context, messages []llm.Message) *pred
 func (rp *funcall) Invoke(ctx context.Context, messages []llm.Message, query string, inputs map[string]any) *predictor {
 	// at end recycle response stream
 	defer close(rp.reponse.stream)
-
+	if rp.maxIterationNum <= 0 {
+		rp.maxIterationNum = MaxIterationNum
+	}
 	maxIterationNum := min(rp.maxIterationNum, MaxIterationNum)
 	// 迭代次数
 	for i := range maxIterationNum {
