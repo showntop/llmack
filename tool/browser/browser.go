@@ -239,22 +239,23 @@ func Tools(browserSession *browser.Session, supportedActions *controller.ActionM
 		}
 	}
 
+	types := openapi3.Types{openapi3.TypeObject}
 	agentThoughtSchema := &openapi3.Schema{
-		Type: openapi3.TypeObject,
+		Type: &types,
 		Properties: map[string]*openapi3.SchemaRef{
 			"evaluation_previous_goal": {
 				Value: &openapi3.Schema{
-					Type: openapi3.TypeString,
+					Type: &openapi3.Types{openapi3.TypeString},
 				},
 			},
 			"memory": {
 				Value: &openapi3.Schema{
-					Type: openapi3.TypeString,
+					Type: &openapi3.Types{openapi3.TypeString},
 				},
 			},
 			"next_goal": {
 				Value: &openapi3.Schema{
-					Type: openapi3.TypeString,
+					Type: &openapi3.Types{openapi3.TypeString},
 				},
 			},
 		},
@@ -266,12 +267,12 @@ func Tools(browserSession *browser.Session, supportedActions *controller.ActionM
 		tool.WithDescription("Use Browser to do some actions(supported actions list see actions field).\n"+prompt),
 		tool.WithParameters(
 			&openapi3.Schema{
-				Type: openapi3.TypeObject,
+				Type: &types,
 				Properties: map[string]*openapi3.SchemaRef{
 					"actions": {
 						Value: &openapi3.Schema{
 							Description: "List of actions to execute",
-							Type:        openapi3.TypeArray,
+							Type:        &openapi3.Types{openapi3.TypeArray},
 							Items: &openapi3.SchemaRef{
 								Value: &openapi3.Schema{
 									Properties: actionSchemas,

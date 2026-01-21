@@ -200,22 +200,22 @@ func (t *AdbTool) NewTools() []any {
 	}
 
 	thoughtSchema := &openapi3.Schema{ // 包含上一次目标的执行评估，记忆，和下一次的目标
-		Type: openapi3.TypeObject,
+		Type: &openapi3.Types{openapi3.TypeObject},
 		Properties: map[string]*openapi3.SchemaRef{
 			"evaluation_previous_goal": {
 				Value: &openapi3.Schema{
-					Type:        openapi3.TypeString,
+					Type:        &openapi3.Types{openapi3.TypeString},
 					Description: "对于上一次目标的评估",
 				},
 			},
 			"memory": {
 				Value: &openapi3.Schema{
-					Type: openapi3.TypeString,
+					Type: &openapi3.Types{openapi3.TypeString},
 				},
 			},
 			"next_goal": {
 				Value: &openapi3.Schema{
-					Type: openapi3.TypeString,
+					Type: &openapi3.Types{openapi3.TypeString},
 				},
 			},
 		},
@@ -223,12 +223,12 @@ func (t *AdbTool) NewTools() []any {
 	}
 
 	paramsSchema := &openapi3.Schema{
-		Type: openapi3.TypeObject,
+		Type: &openapi3.Types{openapi3.TypeObject},
 		Properties: map[string]*openapi3.SchemaRef{
 			"actions": {
 				Value: &openapi3.Schema{
 					Description: "List of actions to execute",
-					Type:        openapi3.TypeArray,
+					Type:        &openapi3.Types{openapi3.TypeArray},
 					Items: &openapi3.SchemaRef{
 						Value: &openapi3.Schema{
 							Properties: actionSchemas,
